@@ -287,6 +287,24 @@
     padding:11px 20px;border-radius:var(--r-md);font-size:.88rem;font-weight:600;box-shadow:var(--sh-2);opacity:0;
     transition:.25s;z-index:60;pointer-events:none;}
   .toast.show{opacity:1;transform:translateX(-50%);}
+  /* ===== login screen ===== */
+  .auth-screen{position:fixed;inset:0;background:var(--sidebar);display:none;align-items:center;justify-content:center;z-index:100;padding:20px;}
+  .auth-card{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-3);padding:34px 30px;width:360px;max-width:100%;text-align:center;}
+  .auth-logo{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--brand),#12b09b);color:#fff;font-weight:800;font-size:1.5rem;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;box-shadow:var(--sh-1);}
+  .auth-card h1{margin:0 0 6px;font-size:1.4rem;letter-spacing:-.02em;}
+  .auth-card p{margin:0 0 18px;color:var(--ink-soft);font-size:.9rem;line-height:1.5;}
+  .auth-card input{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:var(--r-sm);outline:none;font-size:.95rem;margin-bottom:10px;}
+  .auth-card input:focus{border-color:var(--accent);}
+  .auth-card button{width:100%;padding:11px;border-radius:var(--r-sm);background:var(--brand);color:#fff;font-weight:700;font-size:.95rem;}
+  .auth-card button:hover{background:var(--brand-600);}
+  .auth-card button:disabled{opacity:.6;cursor:default;}
+  .auth-msg{margin-top:12px;font-size:.82rem;color:var(--ink-soft);line-height:1.45;min-height:1em;}
+  /* ===== sidebar footer ===== */
+  .side-foot{padding:12px;border-top:1px solid var(--line-dark);}
+  .side-foot .sf-user{font-size:.74rem;color:var(--ink-inv-soft);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px;}
+  .side-foot .sf-actions{display:flex;gap:6px;}
+  .side-foot .sf-actions button{flex:1;padding:7px 4px;border-radius:var(--r-sm);font-size:.74rem;font-weight:600;color:var(--ink-inv-soft);background:rgba(255,255,255,.06);transition:.1s;}
+  .side-foot .sf-actions button:hover{background:rgba(255,255,255,.14);color:#fff;}
 </style>
 </head>
 <body>
@@ -306,6 +324,7 @@
     <button data-view="reports"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>Raporty</button>
   </nav>
   <div class="accts" id="acctList"></div>
+  <div class="side-foot" id="sideFoot"></div>
 </aside>
 
 <!-- ========== MAIN ========== -->
@@ -332,6 +351,19 @@
 <div class="overlay" id="overlay"><div id="modalHost"></div></div>
 <div class="toast" id="toast"></div>
 
+<!-- ========== LOGIN SCREEN ========== -->
+<div class="auth-screen" id="authScreen" style="display:flex">
+  <div class="auth-card">
+    <div class="auth-logo">M</div>
+    <h1>MyBalance</h1>
+    <p>Zaloguj się e-mailem, aby zsynchronizować budżet na wszystkich urządzeniach.</p>
+    <input id="authEmail" type="email" placeholder="twój@email.pl" autocomplete="email">
+    <button id="authBtn">Wyślij link do logowania</button>
+    <div class="auth-msg" id="authMsg"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* =========================================================================
    HOME BUDGET — YNAB-style single-file app
@@ -360,6 +392,7 @@ let state, ui = { view:'budget', month:'2026-08', selCat:null, selAcct:'all', co
 let dragAcctId=null;
 let seqCounter=0;
 const nextSeq=()=>++seqCounter;
+let currentUser=null, applyingRemote=false, saveTimer=null;   // cloud-sync state
 function reorderAccounts(fromId,toId){
   if(!fromId||fromId===toId) return;
   const arr=state.accounts, fi=arr.findIndex(a=>a.id===fromId);
@@ -470,8 +503,12 @@ function initSeq(s){
   (s.transactions||[]).forEach(t=>{ if(t.seq==null) t.seq=++seqCounter; });
   return s;
 }
-function load(){ try{ const s=JSON.parse(localStorage.getItem(STORE)); if(s&&s.accounts) return initSeq(normalize(s)); }catch(e){} return initSeq(seed()); }
-function save(){ localStorage.setItem(STORE, JSON.stringify(state)); }
+function hydrate(s){ return initSeq(normalize(s)); }
+function load(){ try{ const s=JSON.parse(localStorage.getItem(STORE)); if(s&&s.accounts) return hydrate(s); }catch(e){} return hydrate(seed()); }
+function save(){
+  localStorage.setItem(STORE, JSON.stringify(state));                 // local cache
+  if(currentUser && !applyingRemote){ clearTimeout(saveTimer); saveTimer=setTimeout(pushCloud, 600); }  // debounced cloud sync
+}
 const RTA = () => state.meta.rtaKey;
 
 /* ---------- CALCULATIONS ---------- */
@@ -568,6 +605,7 @@ function targetInfo(cat, mKey){
    ========================================================================= */
 function render(){
   renderSidebar();
+  renderSideFoot();
   document.getElementById('mLabel').textContent = keyToLabel(ui.month);
   renderRTA();
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===ui.view));
@@ -1191,9 +1229,118 @@ function autoAssignTargets(){
   render(); toast(funded?('Przypisano '+fmt(funded)+' do celów'):'Wszystkie cele już sfinansowane');
 }
 
-state=load();
-// keep UI month within a sensible default = latest month with data or 2026-08
-render();
+/* =========================================================================
+   CLOUD SYNC + LOGIN (Supabase)
+   ========================================================================= */
+const SUPABASE_URL='https://kjetylkligockvsasmuy.supabase.co';
+const SUPABASE_KEY='sb_publishable_3SRCuHVHJCicopC8WZlo3Q_GRgOnFFD';
+let sb=null;
+try{ sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); }catch(e){ console.error('Supabase init failed', e); }
+
+/* ---- login screen ---- */
+const authScreen=document.getElementById('authScreen');
+function showAuth(msg){ authScreen.style.display='flex'; if(msg!==undefined) setAuthMsg(msg); }
+function hideAuth(){ authScreen.style.display='none'; }
+function setAuthMsg(m,isErr){ const el=document.getElementById('authMsg'); el.textContent=m||''; el.style.color=isErr?'var(--red)':''; }
+async function sendMagicLink(){
+  const email=(document.getElementById('authEmail').value||'').trim();
+  if(!email){ setAuthMsg('Podaj adres e-mail.', true); return; }
+  const btn=document.getElementById('authBtn'); btn.disabled=true; setAuthMsg('Wysyłam link…');
+  const redirect=window.location.origin + window.location.pathname;
+  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: redirect } });
+  btn.disabled=false;
+  if(error) setAuthMsg('Błąd: '+error.message, true);
+  else setAuthMsg('✓ Sprawdź skrzynkę — link do logowania wysłany na '+email+'.');
+}
+
+/* ---- cloud data ---- */
+async function loadCloud(){
+  const { data, error } = await sb.from('budgets').select('data').eq('user_id', currentUser.id).maybeSingle();
+  if(error) throw error;
+  if(data && data.data && data.data.accounts) return hydrate(data.data);
+  const initial = load();                        // first login: migrate current local/seed up to the cloud
+  await sb.from('budgets').upsert({ user_id: currentUser.id, data: initial, updated_at: new Date().toISOString() });
+  return initial;
+}
+async function pushCloud(){
+  if(!sb || !currentUser || !state) return;
+  state.meta = state.meta || {}; state.meta.rev = uid('rev');   // tag our revision so we can ignore the echo
+  localStorage.setItem(STORE, JSON.stringify(state));
+  const { error } = await sb.from('budgets').upsert({ user_id: currentUser.id, data: state, updated_at: new Date().toISOString() });
+  if(error) console.error('Cloud save failed', error);
+}
+let rtChannel=null;
+function subscribeRealtime(){
+  if(rtChannel) return;
+  rtChannel = sb.channel('budget-'+currentUser.id)
+    .on('postgres_changes', { event:'*', schema:'public', table:'budgets', filter:`user_id=eq.${currentUser.id}` }, payload=>{
+      const incoming = payload.new && payload.new.data;
+      if(!incoming || !incoming.accounts) return;
+      if(state && state.meta && incoming.meta && incoming.meta.rev === state.meta.rev) return;   // our own change
+      applyingRemote=true; state=hydrate(incoming); render(); applyingRemote=false;
+      toast('Zsynchronizowano z innym urządzeniem');
+    })
+    .subscribe();
+}
+
+/* ---- JSON backup ---- */
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='mybalance-backup.json';
+  a.click(); URL.revokeObjectURL(a.href); toast('Wyeksportowano kopię JSON');
+}
+function importJSON(file){
+  const r=new FileReader();
+  r.onload=()=>{ try{
+    const obj=JSON.parse(r.result);
+    if(!obj || !obj.accounts){ toast('Nieprawidłowy plik'); return; }
+    if(!confirm('Zaimportować dane z pliku? Zastąpią obecny budżet.')) return;
+    state=hydrate(obj); save(); render(); toast('Zaimportowano dane');
+  }catch(e){ toast('Nie udało się wczytać pliku'); } };
+  r.readAsText(file);
+}
+
+/* ---- sidebar footer (account + backup) ---- */
+function renderSideFoot(){
+  const el=document.getElementById('sideFoot'); if(!el) return;
+  el.innerHTML=`
+    <div class="sf-user">${currentUser?currentUser.email:''}</div>
+    <div class="sf-actions">
+      <button id="sfExport">Eksport</button>
+      <button id="sfImport">Import</button>
+      <button id="sfLogout">Wyloguj</button>
+    </div>
+    <input type="file" id="sfFile" accept="application/json" style="display:none">`;
+  el.querySelector('#sfExport').onclick=exportJSON;
+  el.querySelector('#sfImport').onclick=()=>el.querySelector('#sfFile').click();
+  el.querySelector('#sfFile').onchange=e=>{ if(e.target.files[0]) importJSON(e.target.files[0]); e.target.value=''; };
+  el.querySelector('#sfLogout').onclick=doLogout;
+}
+
+/* ---- session lifecycle ---- */
+async function onLogin(user){
+  if(currentUser) return;
+  currentUser=user; setAuthMsg('Ładuję dane…');
+  try{ state = await loadCloud(); }catch(e){ console.error(e); state = load(); }
+  subscribeRealtime(); hideAuth(); render();
+}
+function onLogout(){
+  if(rtChannel){ sb.removeChannel(rtChannel); rtChannel=null; }
+  currentUser=null; state=null;
+  const em=document.getElementById('authEmail'); if(em) em.value='';
+  showAuth('');
+}
+async function doLogout(){ if(sb) await sb.auth.signOut(); onLogout(); }
+
+async function bootstrap(){
+  if(!sb){ showAuth('Nie udało się połączyć z usługą synchronizacji. Odśwież stronę.'); return; }
+  document.getElementById('authBtn').onclick=sendMagicLink;
+  document.getElementById('authEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') sendMagicLink(); });
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session) await onLogin(session.user); else showAuth();
+  sb.auth.onAuthStateChange((_e, s)=>{ if(s && !currentUser) onLogin(s.user); else if(!s && currentUser) onLogout(); });
+}
+bootstrap();
 </script>
 </body>
 </html>
