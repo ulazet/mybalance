@@ -287,6 +287,77 @@
     padding:11px 20px;border-radius:var(--r-md);font-size:.88rem;font-weight:600;box-shadow:var(--sh-2);opacity:0;
     transition:.25s;z-index:60;pointer-events:none;}
   .toast.show{opacity:1;transform:translateX(-50%);}
+  /* ===== mobile controls (hidden on desktop) ===== */
+  .menu-btn{display:none;width:36px;height:36px;border-radius:var(--r-sm);align-items:center;justify-content:center;color:var(--ink-soft);flex:0 0 auto;}
+  .menu-btn:hover{background:var(--surface-2);}
+  .botbar{display:none;}
+  .side-backdrop{display:none;}
+  .sheet-close{display:none;}
+  .mobile-only{display:none;}
+
+  /* ===== RESPONSIVE (phones / small tablets) ===== */
+  @media (max-width:768px){
+    body{display:block;}
+    .menu-btn{display:flex;}
+
+    /* sidebar becomes an off-canvas drawer */
+    .sidebar{position:fixed;top:0;left:0;height:100vh;width:280px;max-width:82vw;flex:none;z-index:90;
+      transform:translateX(-100%);transition:transform .25s ease;box-shadow:var(--sh-3);}
+    .sidebar.open{transform:translateX(0);}
+    /* drawer shows full nav; collapse is a desktop-only feature */
+    .sidebar .collapse-btn{display:none;}
+    .sidebar.collapsed{width:280px;max-width:82vw;}
+    .sidebar.collapsed .brand{flex-direction:row;}
+    .sidebar.collapsed .brand-txt,.sidebar.collapsed .accts,.sidebar.collapsed .side-foot,.sidebar.collapsed .nav button span{display:block;}
+    .sidebar.collapsed .nav button{justify-content:flex-start;padding:9px 12px;}
+    .side-backdrop{position:fixed;inset:0;background:rgba(15,27,45,.5);z-index:80;}
+    .side-backdrop.show{display:block;}
+
+    .main{width:100%;height:100vh;}
+    .topbar{height:56px;flex:0 0 56px;padding:0 12px;gap:8px;}
+    .monthnav .mlabel{min-width:auto;font-size:.92rem;}
+    .monthnav button.arw{width:28px;height:28px;}
+    .rta{padding:6px 10px;gap:6px;}
+    .rta .amt{font-size:1rem;}
+    .rta .lab{display:none;}
+    #addTxnBtn{padding:9px;}
+    #addTxnBtn .btn-label{display:none;}
+
+    /* single-column content with room for the bottom bar */
+    .content{padding:14px;padding-bottom:80px;gap:14px;}
+
+    /* bottom tab bar */
+    .botbar{display:flex;position:fixed;left:0;right:0;bottom:0;height:62px;background:var(--surface);
+      border-top:1px solid var(--line);z-index:70;box-shadow:0 -2px 10px rgba(15,27,45,.06);}
+    .botbar button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+      color:var(--ink-soft);font-size:.66rem;font-weight:600;}
+    .botbar button svg{width:20px;height:20px;}
+    .botbar button.active{color:var(--brand);}
+
+    /* side panels become bottom sheets */
+    .inspector{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;flex:none;max-height:86vh;overflow-y:auto;
+      border-radius:var(--r-lg) var(--r-lg) 0 0;transform:translateY(105%);transition:transform .25s ease;
+      z-index:95;box-shadow:var(--sh-3);}
+    .inspector.sheet-open{transform:translateY(0);}
+    .sheet-close{display:flex;justify-content:flex-end;margin:-8px -8px 2px;}
+    .sheet-close button{width:36px;height:36px;border-radius:var(--r-sm);font-size:1.25rem;color:var(--ink-soft);}
+
+    /* budget grid: drop the Activity column to fit */
+    .c-act,.activity-cell{display:none;}
+    .brow-h,.cg-head,.cat-row{grid-template-columns:minmax(0,1fr) 84px 94px;}
+
+    /* summary cards shrink to fit three-across */
+    .flow-summary{padding:12px;gap:8px;}
+    .flow-card{min-width:0;padding:9px 10px;}
+    .flow-card .fl{font-size:.6rem;}
+    .flow-card .fv{font-size:.84rem;}
+    /* transactions: hide inline action buttons (tap a row to edit), tighten cells */
+    .txn-table th:last-child,.txn-table td:last-child{display:none;}
+    .txn-table th,.txn-table td{padding:9px 8px;font-size:.82rem;}
+    .txn-table tbody tr{cursor:pointer;}
+    .mobile-only{display:inline-flex;}
+  }
+
   /* ===== login screen ===== */
   .auth-screen{position:fixed;inset:0;background:var(--sidebar);display:none;align-items:center;justify-content:center;z-index:100;padding:20px;}
   .auth-card{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-3);padding:34px 30px;width:360px;max-width:100%;text-align:center;}
@@ -299,6 +370,26 @@
   .auth-card button:hover{background:var(--brand-600);}
   .auth-card button:disabled{opacity:.6;cursor:default;}
   .auth-msg{margin-top:12px;font-size:.82rem;color:var(--ink-soft);line-height:1.45;min-height:1em;}
+  /* ===== collapsible desktop sidebar ===== */
+  .brand{position:relative;}
+  .brand-txt{min-width:0;}
+  .collapse-btn{position:absolute;top:16px;right:12px;width:26px;height:26px;border-radius:var(--r-sm);
+    display:flex;align-items:center;justify-content:center;color:var(--ink-inv-soft);transition:.15s;}
+  .collapse-btn:hover{background:rgba(255,255,255,.12);color:#fff;}
+  .nav button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sidebar.collapsed{width:68px;flex-basis:68px;}
+  .sidebar.collapsed .brand{flex-direction:column;gap:10px;}
+  .sidebar.collapsed .brand-txt{display:none;}
+  .sidebar.collapsed .collapse-btn{position:static;transform:rotate(180deg);}
+  .sidebar.collapsed .nav button{justify-content:center;padding:11px 0;}
+  .sidebar.collapsed .nav button span{display:none;}
+  .sidebar.collapsed .accts,.sidebar.collapsed .side-foot{display:none;}
+  /* ===== language toggle ===== */
+  .lang-tog{display:flex;gap:4px;margin-bottom:10px;}
+  .lang-tog button{flex:1;padding:6px;border-radius:var(--r-sm);font-size:.72rem;font-weight:700;
+    color:var(--ink-inv-soft);background:rgba(255,255,255,.06);transition:.1s;}
+  .lang-tog button.on{background:var(--brand);color:#fff;}
+  .lang-tog button:not(.on):hover{background:rgba(255,255,255,.14);color:#fff;}
   /* ===== sidebar footer ===== */
   .side-foot{padding:12px;border-top:1px solid var(--line-dark);}
   .side-foot .sf-user{font-size:.74rem;color:var(--ink-inv-soft);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px;}
@@ -310,19 +401,16 @@
 <body>
 
 <!-- ========== SIDEBAR ========== -->
-<aside class="sidebar">
+<aside class="sidebar" id="sidebar">
   <div class="brand">
     <div class="logo">M</div>
-    <div>
+    <div class="brand-txt">
       <h1>MyBalance</h1>
-      <small>Budżet domowy · PLN</small>
+      <small id="brandTag"></small>
     </div>
+    <button class="collapse-btn" id="collapseBtn" aria-label="Collapse"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg></button>
   </div>
-  <nav class="nav">
-    <button data-view="budget" class="active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>Budżet</button>
-    <button data-view="accounts"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Transakcje</button>
-    <button data-view="reports"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>Raporty</button>
-  </nav>
+  <nav class="nav" id="navMain"></nav>
   <div class="accts" id="acctList"></div>
   <div class="side-foot" id="sideFoot"></div>
 </aside>
@@ -330,22 +418,27 @@
 <!-- ========== MAIN ========== -->
 <main class="main">
   <header class="topbar">
+    <button class="menu-btn" id="menuBtn" aria-label="Menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
     <div class="monthnav">
       <button class="arw" id="prevM">‹</button>
       <div class="mlabel" id="mLabel">—</div>
       <button class="arw" id="nextM">›</button>
     </div>
     <div class="spacer"></div>
-    <div class="rta" id="rtaPill" title="Kliknij, aby przypisać wszystko do 0">
+    <div class="rta" id="rtaPill">
       <div>
         <div class="amt" id="rtaAmt">0,00 zł</div>
       </div>
-      <div class="lab">Do<br>przypisania</div>
+      <div class="lab" id="rtaLab"></div>
     </div>
-    <button class="btn" id="addTxnBtn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Transakcja</button>
+    <button class="btn" id="addTxnBtn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg><span class="btn-label" id="addTxnLabel"></span></button>
   </header>
   <div class="content" id="content"></div>
 </main>
+
+<!-- ========== MOBILE NAV / DRAWER ========== -->
+<div class="side-backdrop" id="sideBackdrop"></div>
+<nav class="botbar" id="botbar"></nav>
 
 <!-- ========== MODAL ROOT ========== -->
 <div class="overlay" id="overlay"><div id="modalHost"></div></div>
@@ -356,9 +449,9 @@
   <div class="auth-card">
     <div class="auth-logo">M</div>
     <h1>MyBalance</h1>
-    <p>Zaloguj się e-mailem, aby zsynchronizować budżet na wszystkich urządzeniach.</p>
-    <input id="authEmail" type="email" placeholder="twój@email.pl" autocomplete="email">
-    <button id="authBtn">Wyślij link do logowania</button>
+    <p id="authIntro"></p>
+    <input id="authEmail" type="email" placeholder="" autocomplete="email">
+    <button id="authBtn"></button>
     <div class="auth-msg" id="authMsg"></div>
   </div>
 </div>
@@ -372,9 +465,112 @@
 const CUR = new Intl.NumberFormat('pl-PL',{style:'currency',currency:'PLN',useGrouping:'always',minimumFractionDigits:2,maximumFractionDigits:2});
 const fmt = gr => CUR.format(gr/100);
 const uid = p => p+'_'+Math.random().toString(36).slice(2,8);
-const MONTHS_PL = ['styczeń','luty','marzec','kwiecień','maj','czerwiec','lipiec','sierpień','wrzesień','październik','listopad','grudzień'];
+/* ========================= i18n ========================= */
+let LANG = (localStorage.getItem('mb_lang')||'en');
+const MONTHS = {
+  en:['January','February','March','April','May','June','July','August','September','October','November','December'],
+  pl:['styczeń','luty','marzec','kwiecień','maj','czerwiec','lipiec','sierpień','wrzesień','październik','listopad','grudzień']
+};
+const I18N = {
+  en:{
+    tagline:'Home budget · PLN', ready_to_assign:'Ready to<br>assign', rta_tip:'Click to fund all monthly targets',
+    add_txn:'Transaction',
+    nav_dashboard:'Dashboard', nav_budget:'Budget', nav_transactions:'Transactions', nav_accounts:'Accounts', nav_reports:'Reports', nav_more:'More',
+    on_budget:'On-budget', tracking:'Tracking', add_account:'+ Add account', net_worth:'Net worth',
+    export:'Export', import:'Import', logout:'Log out', language:'Language',
+    auth_intro:'Sign in with your email to sync your budget across all your devices.', auth_email_ph:'you@email.com',
+    auth_send:'Send login link', auth_enter_email:'Enter your email.', auth_sending:'Sending link…',
+    auth_sent:e=>`✓ Check your inbox — a login link was sent to ${e}.`, auth_error:m=>`Error: ${m}`,
+    auth_loading:'Loading your data…', auth_conn_fail:'Could not connect to the sync service. Please refresh.',
+    col_category:'Category', col_assigned:'Assigned', col_activity:'Activity', col_available:'Available',
+    add_category:'+ Category', add_group:'+ Add category group',
+    insp_pick_cat:'Select a category to set a target, assign, or move money.',
+    available:'Available', target:'Target', target_type:'Target type', target_none:'No target',
+    target_monthly:'Set aside monthly', target_balance:'Reach a balance', amount_zl:'Amount (zł)', save_target:'Save target',
+    target_met:'✓ Target met', target_short:x=>`${x} short`, move_money:'Move money', amount:'Amount', direction:'Direction',
+    to_this_cat:'To this cat.', from_this_cat:'From this cat.', other_category:'Other category', rta_opt:'Ready to Assign',
+    move:'Move', delete_category:'Delete category', target_saved:'Target saved', enter_amount:'Enter an amount',
+    moved:x=>`Moved ${x}`, del_cat_confirm:'Delete category? Its transactions will keep no category.',
+    all_accounts:'All accounts', balance:'Balance', details:'Details', inflow:'Inflow', outflow:'Outflow', flow_balance:'Balance',
+    col_date:'Date', col_payee:'Payee', col_account:'Account', col_amount:'Amount', no_txn_month:'No transactions this month',
+    pill_income:'Income', pill_uncat:'Uncategorized', pocket:'Pocket', edit:'Edit', delete:'Delete', del_txn_confirm:'Delete this transaction?',
+    debt_balance:'Debt balance', available_funds:'Available funds', credit_limit:'Credit limit', pockets:'Pockets',
+    edit_account:'✎ Edit account', pick_account:'Select an account to see its details.',
+    type_checking:'Checking account', type_savings:'Savings account', type_cash:'Cash', type_credit:'Credit card', type_tracking:'Tracking (investments / loan)',
+    edit_account_title:'Edit account', account_name:'Account name', account_type:'Account type', account_number:'Account number',
+    add_pocket:'+ Add pocket', no_pockets:'No pockets — add your first below.', pocket_name_ph:'Pocket name',
+    delete_account:'Delete account', del_account_n:n=>` (${n} transactions)`, cancel:'Cancel', save:'Save',
+    pocket_adjust:'Pocket adjustment', changes_saved:'Changes saved', account_deleted:'Account deleted', enter_name:'Enter a name',
+    nrb_len:'Account number must be 26 digits (optional PL prefix).', nrb_checksum:'Invalid account number checksum (NRB).',
+    del_acct_confirm:(name,n)=>`Delete account “${name}”?`+(n?`\n${n} transactions will be permanently removed.`:''),
+    new_account:'New account', name:'Name', type:'Type', account_number_opt:'Account number (optional)',
+    starting_balance:'Starting balance (zł)', add:'Add', starting_balance_payee:'Starting balance', account_added:'Account added',
+    new_txn:'New transaction', expense:'Expense', income:'Income', transfer:'Transfer', account:'Account',
+    from_ep:'From (account / pocket)', to_ep:'To (account / pocket)', date:'Date', payee_note:'Payee / note', category:'Category',
+    payee_ph:'e.g. Grocery store', unnamed:'(unnamed)', diff_places:'Choose two different places', transfer_done:'Transfer complete',
+    txn_added:'Transaction added', edit_txn:'Edit transaction', transfer_edit_note:'Edit transfers by deleting and re-adding',
+    new_category:'New category', category_name:'Category name', category_ph:'e.g. Subscriptions',
+    new_group:'New category group', group_name:'Group name', group_ph:'e.g. Kids',
+    dash_income:'Income', dash_expenses:'Expenses', dash_month_balance:'Month balance', dash_net_worth:'Net worth',
+    spending_by_cat:'Spending by category', no_expenses:'No expenses this month.', account_balances:'Account balances',
+    transfer_to:n=>`Transfer to ${n}`, transfer_from:n=>`Transfer from ${n}`, pocket_topup:'Top up pocket', pocket_withdraw:'Withdraw from pocket',
+    to_pocket:n=>`To: ${n}`, from_pocket:n=>`From: ${n}`, transfer_out_pocket:'Transfer from pocket', transfer_in_pocket:'Transfer to pocket',
+    assigned_to_targets:x=>`Assigned ${x} to targets`, all_targets_funded:'All targets already funded',
+    exported:'JSON backup exported', invalid_file:'Invalid file', import_confirm:'Import data from file? It will replace the current budget.',
+    imported:'Data imported', import_fail:'Could not read the file', synced_other:'Synced from another device'
+  },
+  pl:{
+    tagline:'Budżet domowy · PLN', ready_to_assign:'Do<br>przypisania', rta_tip:'Kliknij, aby sfinansować cele miesięczne',
+    add_txn:'Transakcja',
+    nav_dashboard:'Pulpit', nav_budget:'Budżet', nav_transactions:'Transakcje', nav_accounts:'Konta', nav_reports:'Raporty', nav_more:'Więcej',
+    on_budget:'Budżetowe', tracking:'Śledzone', add_account:'+ Dodaj konto', net_worth:'Wartość netto',
+    export:'Eksport', import:'Import', logout:'Wyloguj', language:'Język',
+    auth_intro:'Zaloguj się e-mailem, aby zsynchronizować budżet na wszystkich urządzeniach.', auth_email_ph:'twój@email.pl',
+    auth_send:'Wyślij link do logowania', auth_enter_email:'Podaj adres e-mail.', auth_sending:'Wysyłam link…',
+    auth_sent:e=>`✓ Sprawdź skrzynkę — link do logowania wysłany na ${e}.`, auth_error:m=>`Błąd: ${m}`,
+    auth_loading:'Ładuję dane…', auth_conn_fail:'Nie udało się połączyć z usługą synchronizacji. Odśwież stronę.',
+    col_category:'Kategoria', col_assigned:'Przypisane', col_activity:'Aktywność', col_available:'Dostępne',
+    add_category:'+ Kategoria', add_group:'+ Dodaj grupę kategorii',
+    insp_pick_cat:'Wybierz kategorię, aby ustawić cel, przypisać lub przenieść pieniądze.',
+    available:'Dostępne', target:'Cel', target_type:'Typ celu', target_none:'Brak celu',
+    target_monthly:'Odkładaj co miesiąc', target_balance:'Uzbieraj saldo', amount_zl:'Kwota (zł)', save_target:'Zapisz cel',
+    target_met:'✓ Cel osiągnięty', target_short:x=>`Brakuje ${x}`, move_money:'Przenieś pieniądze', amount:'Kwota', direction:'Kierunek',
+    to_this_cat:'Do tej kat.', from_this_cat:'Z tej kat.', other_category:'Druga kategoria', rta_opt:'Do przypisania',
+    move:'Przenieś', delete_category:'Usuń kategorię', target_saved:'Cel zapisany', enter_amount:'Podaj kwotę',
+    moved:x=>`Przeniesiono ${x}`, del_cat_confirm:'Usunąć kategorię? Transakcje pozostaną bez kategorii.',
+    all_accounts:'Wszystkie konta', balance:'Saldo', details:'Szczegóły', inflow:'Wpływy', outflow:'Wydatki', flow_balance:'Bilans',
+    col_date:'Data', col_payee:'Odbiorca', col_account:'Konto', col_amount:'Kwota', no_txn_month:'Brak transakcji w tym miesiącu',
+    pill_income:'Przychód', pill_uncat:'Bez kategorii', pocket:'Podkonto', edit:'Edytuj', delete:'Usuń', del_txn_confirm:'Usunąć tę transakcję?',
+    debt_balance:'Saldo zadłużenia', available_funds:'Dostępne środki', credit_limit:'Limit kredytowy', pockets:'Podkonta',
+    edit_account:'✎ Edytuj konto', pick_account:'Wybierz konto, aby zobaczyć szczegóły.',
+    type_checking:'Konto osobiste', type_savings:'Konto oszczędnościowe', type_cash:'Gotówka', type_credit:'Karta kredytowa', type_tracking:'Śledzone (inwestycje / kredyt)',
+    edit_account_title:'Edytuj konto', account_name:'Nazwa konta', account_type:'Typ konta', account_number:'Numer konta',
+    add_pocket:'+ Dodaj podkonto', no_pockets:'Brak podkont — dodaj pierwsze poniżej.', pocket_name_ph:'Nazwa podkonta',
+    delete_account:'Usuń konto', del_account_n:n=>` (${n} transakcji)`, cancel:'Anuluj', save:'Zapisz',
+    pocket_adjust:'Korekta podkonta', changes_saved:'Zapisano zmiany', account_deleted:'Konto usunięte', enter_name:'Podaj nazwę',
+    nrb_len:'Numer rachunku musi mieć 26 cyfr (opcjonalnie z prefiksem PL).', nrb_checksum:'Nieprawidłowa suma kontrolna numeru rachunku (NRB).',
+    del_acct_confirm:(name,n)=>`Usunąć konto „${name}"?`+(n?`\nZostanie trwale usuniętych ${n} transakcji.`:''),
+    new_account:'Nowe konto', name:'Nazwa', type:'Typ', account_number_opt:'Numer konta (opcjonalnie)',
+    starting_balance:'Saldo początkowe (zł)', add:'Dodaj', starting_balance_payee:'Saldo początkowe', account_added:'Dodano konto',
+    new_txn:'Nowa transakcja', expense:'Wydatek', income:'Przychód', transfer:'Przelew', account:'Konto',
+    from_ep:'Z (konto / podkonto)', to_ep:'Do (konto / podkonto)', date:'Data', payee_note:'Odbiorca / opis', category:'Kategoria',
+    payee_ph:'np. Biedronka', unnamed:'(bez nazwy)', diff_places:'Wybierz różne miejsca', transfer_done:'Przelew wykonany',
+    txn_added:'Dodano transakcję', edit_txn:'Edytuj transakcję', transfer_edit_note:'Przelewy edytuj przez usunięcie i dodanie',
+    new_category:'Nowa kategoria', category_name:'Nazwa kategorii', category_ph:'np. Subskrypcje',
+    new_group:'Nowa grupa kategorii', group_name:'Nazwa grupy', group_ph:'np. Dzieci',
+    dash_income:'Przychód', dash_expenses:'Wydatki', dash_month_balance:'Bilans miesiąca', dash_net_worth:'Wartość netto',
+    spending_by_cat:'Wydatki wg kategorii', no_expenses:'Brak wydatków w tym miesiącu.', account_balances:'Salda kont',
+    transfer_to:n=>`Przelew do ${n}`, transfer_from:n=>`Przelew z ${n}`, pocket_topup:'Zasilenie podkonta', pocket_withdraw:'Wypłata z podkonta',
+    to_pocket:n=>`Do: ${n}`, from_pocket:n=>`Z: ${n}`, transfer_out_pocket:'Przelew z podkonta', transfer_in_pocket:'Przelew na podkonto',
+    assigned_to_targets:x=>`Przypisano ${x} do celów`, all_targets_funded:'Wszystkie cele już sfinansowane',
+    exported:'Wyeksportowano kopię JSON', invalid_file:'Nieprawidłowy plik', import_confirm:'Zaimportować dane z pliku? Zastąpią obecny budżet.',
+    imported:'Zaimportowano dane', import_fail:'Nie udało się wczytać pliku', synced_other:'Zsynchronizowano z innym urządzeniem'
+  }
+};
+function T(k,...a){ let v=(I18N[LANG]&&I18N[LANG][k]); if(v==null) v=I18N.en[k]; if(v==null) return k; return typeof v==='function'?v(...a):v; }
+function acctTypeLabel(type){ return T('type_'+type); }
 const monthKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-const keyToLabel = k => { const [y,m]=k.split('-'); return `${MONTHS_PL[+m-1]} ${y}`; };
+const keyToLabel = k => { const [y,m]=k.split('-'); return `${(MONTHS[LANG]||MONTHS.en)[+m-1]} ${y}`; };
 const txnMonth = t => t.date.slice(0,7);
 // date for "now" actions (e.g. pocket rebalances): real today if it falls in the viewed month,
 // otherwise anchored to the last day of the viewed month so the entry shows at the top of that month's list
@@ -388,7 +584,7 @@ function nowInMonth(){
 const parseAmt = s => { if(s==null) return 0; s=(''+s).replace(/\s/g,'').replace('zł','').replace(',','.'); const n=parseFloat(s); return isNaN(n)?0:Math.round(n*100); };
 
 const STORE = 'ynab_pl_budget_v1';
-let state, ui = { view:'budget', month:'2026-08', selCat:null, selAcct:'all', collapsed:{} };
+let state, ui = { view:'dashboard', month:'2026-08', selCat:null, selAcct:'all', collapsed:{} };
 let dragAcctId=null;
 let seqCounter=0;
 const nextSeq=()=>++seqCounter;
@@ -537,13 +733,13 @@ function doTransfer(src,dst,amount,date){
   if(amount<=0) return;
   const link=uid('lnk');
   if(src.accountId===dst.accountId){
-    if(src.pocketId) pushPocketTxn(src.accountId,src.pocketId,-amount,date, dst.pocketId?'Do: '+(pocketById(dst.pocketId)?.name||'podkonto'):'Wypłata z podkonta', link);
-    if(dst.pocketId) pushPocketTxn(dst.accountId,dst.pocketId,+amount,date, src.pocketId?'Z: '+(pocketById(src.pocketId)?.name||'podkonto'):'Zasilenie podkonta', link);
+    if(src.pocketId) pushPocketTxn(src.accountId,src.pocketId,-amount,date, dst.pocketId?T('to_pocket',(pocketById(dst.pocketId)?.name||T('pocket'))):T('pocket_withdraw'), link);
+    if(dst.pocketId) pushPocketTxn(dst.accountId,dst.pocketId,+amount,date, src.pocketId?T('from_pocket',(pocketById(src.pocketId)?.name||T('pocket'))):T('pocket_topup'), link);
   } else {
-    state.transactions.push({id:uid('t'),seq:nextSeq(),date,accountId:src.accountId,payee:'Przelew do '+acctName(dst.accountId),categoryId:null,amount:-amount,memo:'',cleared:true,type:'transfer',transferAccountId:dst.accountId,transferId:link});
-    state.transactions.push({id:uid('t'),seq:nextSeq(),date,accountId:dst.accountId,payee:'Przelew z '+acctName(src.accountId),categoryId:null,amount:+amount,memo:'',cleared:true,type:'transfer',transferAccountId:src.accountId,transferId:link});
-    if(src.pocketId) pushPocketTxn(src.accountId,src.pocketId,-amount,date,'Przelew z podkonta', link);
-    if(dst.pocketId) pushPocketTxn(dst.accountId,dst.pocketId,+amount,date,'Przelew na podkonto', link);
+    state.transactions.push({id:uid('t'),seq:nextSeq(),date,accountId:src.accountId,payee:T('transfer_to',acctName(dst.accountId)),categoryId:null,amount:-amount,memo:'',cleared:true,type:'transfer',transferAccountId:dst.accountId,transferId:link});
+    state.transactions.push({id:uid('t'),seq:nextSeq(),date,accountId:dst.accountId,payee:T('transfer_from',acctName(src.accountId)),categoryId:null,amount:+amount,memo:'',cleared:true,type:'transfer',transferAccountId:src.accountId,transferId:link});
+    if(src.pocketId) pushPocketTxn(src.accountId,src.pocketId,-amount,date,T('transfer_out_pocket'), link);
+    if(dst.pocketId) pushPocketTxn(dst.accountId,dst.pocketId,+amount,date,T('transfer_in_pocket'), link);
   }
 }
 // delete a transaction (and, for transfers, all linked legs + pocket earmarks sharing its transferId)
@@ -600,20 +796,66 @@ function targetInfo(cat, mKey){
   return {state:'none'};
 }
 
+/* ---------- NAV / CHROME / LANGUAGE ---------- */
+const ICON={
+  dashboard:`<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>`,
+  budget:`<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>`,
+  txn:`<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>`,
+  konta:`<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h12v3"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V10a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2Z"/><circle cx="17" cy="13.5" r="1.2" fill="currentColor" stroke="none"/></svg>`,
+  reports:`<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>`,
+  more:`<svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>`
+};
+const NAV=[
+  {v:'dashboard',k:'nav_dashboard',ico:ICON.dashboard},
+  {v:'budget',k:'nav_budget',ico:ICON.budget},
+  {v:'accounts',k:'nav_transactions',ico:ICON.txn},
+  {v:'konta',k:'nav_accounts',ico:ICON.konta},
+  {v:'reports',k:'nav_reports',ico:ICON.reports},
+];
+const BOT=['dashboard','budget','accounts'];
+function navTo(v){ ui.view=v; ui.acctSheet=false; closeSidebar(); render(); }
+function renderNav(){
+  const nav=document.getElementById('navMain');
+  nav.innerHTML=NAV.map(n=>`<button data-view="${n.v}" class="${ui.view===n.v?'active':''}">${n.ico}<span>${T(n.k)}</span></button>`).join('');
+  nav.querySelectorAll('button').forEach(b=>b.onclick=()=>navTo(b.dataset.view));
+  const bb=document.getElementById('botbar');
+  bb.innerHTML=BOT.map(v=>{const n=NAV.find(x=>x.v===v);return `<button data-view="${v}" class="${ui.view===v?'active':''}">${n.ico}<span>${T(n.k)}</span></button>`;}).join('');
+  bb.querySelectorAll('button[data-view]').forEach(b=>b.onclick=()=>navTo(b.dataset.view));
+}
+function setChrome(){
+  const g=id=>document.getElementById(id);
+  if(g('brandTag')) g('brandTag').textContent=T('tagline');
+  if(g('rtaLab')) g('rtaLab').innerHTML=T('ready_to_assign');
+  if(g('rtaPill')) g('rtaPill').title=T('rta_tip');
+  if(g('addTxnLabel')) g('addTxnLabel').textContent=T('add_txn');
+  if(g('authIntro')) g('authIntro').textContent=T('auth_intro');
+  if(g('authEmail')) g('authEmail').placeholder=T('auth_email_ph');
+  const ab=g('authBtn'); if(ab && !ab.disabled) ab.textContent=T('auth_send');
+}
+function setLang(l){ LANG=l; localStorage.setItem('mb_lang',l); setChrome(); if(state) render(); }
+let railCollapsed = localStorage.getItem('mb_rail')==='1';
+function applyRail(){ const s=document.getElementById('sidebar'); if(s) s.classList.toggle('collapsed', railCollapsed); }
+function toggleRail(){ railCollapsed=!railCollapsed; localStorage.setItem('mb_rail', railCollapsed?'1':'0'); applyRail(); }
+
 /* =========================================================================
    RENDER
    ========================================================================= */
 function render(){
+  setChrome();
+  renderNav();
   renderSidebar();
   renderSideFoot();
   document.getElementById('mLabel').textContent = keyToLabel(ui.month);
   renderRTA();
-  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===ui.view));
   const c=document.getElementById('content');
-  c.className = (ui.view==='budget'||ui.view==='accounts') ? 'content' : 'content solo';
-  if(ui.view==='budget') c.innerHTML='', c.append(budgetView(), inspectorView());
-  else if(ui.view==='accounts') c.innerHTML='', c.append(accountsView(), accountDetailsPanel());
-  else c.innerHTML='', c.append(reportsView());
+  const twoPane = ui.view==='budget'||ui.view==='accounts';
+  c.className = twoPane ? 'content' : 'content solo';
+  c.innerHTML='';
+  if(ui.view==='budget') c.append(budgetView(), inspectorView());
+  else if(ui.view==='accounts') c.append(accountsView(), accountDetailsPanel());
+  else if(ui.view==='dashboard') c.append(dashboardView());
+  else if(ui.view==='konta') c.append(kontaView());
+  else c.append(reportsView());
   save();
 }
 
@@ -632,13 +874,13 @@ function renderSidebar(){
       <div class="nm"><span class="dot" style="background:${acctColor(a.type)}"></span><span>${a.name}</span></div>
       <div class="bal ${bal<0?'neg':''}">${fmt(bal)}</div></div>`;
   };
-  let html = `<div class="acct-group-h">Budżetowe</div>` + budg.map(acctRow).join('');
-  if(track.length) html+=`<div class="acct-group-h">Śledzone</div>`+track.map(acctRow).join('');
-  html+=`<button class="add-acct" id="addAcctBtn">+ Dodaj konto</button>`;
-  html+=`<div class="networth"><div class="l">Wartość netto</div><div class="v">${fmt(netWorth())}</div></div>`;
+  let html = `<div class="acct-group-h">${T('on_budget')}</div>` + budg.map(acctRow).join('');
+  if(track.length) html+=`<div class="acct-group-h">${T('tracking')}</div>`+track.map(acctRow).join('');
+  html+=`<button class="add-acct" id="addAcctBtn">${T('add_account')}</button>`;
+  html+=`<div class="networth"><div class="l">${T('net_worth')}</div><div class="v">${fmt(netWorth())}</div></div>`;
   host.innerHTML=html;
   host.querySelectorAll('.acct').forEach(el=>{
-    el.onclick=()=>{ui.selAcct=el.dataset.acct;ui.view='accounts';render();};
+    el.onclick=()=>{ui.selAcct=el.dataset.acct;ui.view='accounts';ui.acctSheet=false;closeSidebar();render();};
     el.setAttribute('draggable','true');
     el.ondragstart=e=>{dragAcctId=el.dataset.acct; e.dataTransfer.effectAllowed='move'; el.classList.add('dragging');};
     el.ondragend=()=>{dragAcctId=null; host.querySelectorAll('.acct').forEach(x=>x.classList.remove('dragging','drag-over'));};
@@ -654,7 +896,7 @@ function acctColor(t){return {checking:'#2f7de1',savings:'#0a7d6e',cash:'#1f9d57
 function budgetView(){
   const wrap=document.createElement('div'); wrap.className='budget-wrap';
   const t=document.createElement('div'); t.className='btable';
-  t.innerHTML=`<div class="brow-h"><div>Kategoria</div><div class="num">Przypisane</div><div class="num">Aktywność</div><div class="num">Dostępne</div></div>`;
+  t.innerHTML=`<div class="brow-h"><div>${T('col_category')}</div><div class="num">${T('col_assigned')}</div><div class="num c-act">${T('col_activity')}</div><div class="num">${T('col_available')}</div></div>`;
   state.groups.forEach(g=>{
     const gEl=document.createElement('div'); gEl.className='cat-group'+(ui.collapsed[g.id]?' collapsed':'');
     let gAsg=0,gAct=0,gAvl=0;
@@ -673,13 +915,13 @@ function budgetView(){
     }).join('');
     gEl.innerHTML=`<div class="cg-head" data-group="${g.id}">
         <div class="nm"><span class="caret">▼</span>${g.name}</div>
-        <div class="num">${fmt(gAsg)}</div><div class="num">${gAct?fmt(gAct):'—'}</div><div class="num">${fmt(gAvl)}</div>
-      </div>${rows}<button class="add-cat" data-addcat="${g.id}">+ Kategoria</button>`;
+        <div class="num">${fmt(gAsg)}</div><div class="num c-act">${gAct?fmt(gAct):'—'}</div><div class="num">${fmt(gAvl)}</div>
+      </div>${rows}<button class="add-cat" data-addcat="${g.id}">${T('add_category')}</button>`;
     t.append(gEl);
   });
   wrap.append(t);
   const foot=document.createElement('div'); foot.className='table-foot';
-  foot.innerHTML=`<button class="btn ghost" id="addGroupBtn">+ Dodaj grupę kategorii</button>`;
+  foot.innerHTML=`<button class="btn ghost" id="addGroupBtn">${T('add_group')}</button>`;
   wrap.append(foot);
 
   // events
@@ -711,58 +953,61 @@ function editAssign(el){
 function inspectorView(){
   const el=document.createElement('div'); el.className='inspector';
   if(!ui.selCat){
-    el.innerHTML=`<div class="insp-empty"><div class="ico">👆</div>Wybierz kategorię, aby ustawić cel, przypisać lub przenieść pieniądze.</div>`;
+    el.innerHTML=`<div class="insp-empty"><div class="ico">👆</div>${T('insp_pick_cat')}</div>`;
     return el;
   }
   const c=catById(ui.selCat); if(!c){ui.selCat=null;return inspectorView();}
+  el.classList.add('sheet-open');
   const avl=available(c.id,ui.month), ti=targetInfo(c,ui.month);
   const cls=avl<0?'red':avl>0?'green':'';
   const otherCats=allCats().filter(x=>x.id!==c.id);
   el.innerHTML=`
+    <div class="sheet-close"><button data-sheetclose>✕</button></div>
     <div class="insp-title">${c.name}</div>
     <div class="insp-sub">${keyToLabel(ui.month)}</div>
-    <div class="insp-avail"><div class="v" style="color:${avl<0?'var(--red)':avl>0?'var(--green)':'var(--ink)'}">${fmt(avl)}</div><div class="l">Dostępne</div></div>
+    <div class="insp-avail"><div class="v" style="color:${avl<0?'var(--red)':avl>0?'var(--green)':'var(--ink)'}">${fmt(avl)}</div><div class="l">${T('available')}</div></div>
 
     <div class="insp-sec">
-      <h4>Cel</h4>
-      <div class="field"><label>Typ celu</label>
+      <h4>${T('target')}</h4>
+      <div class="field"><label>${T('target_type')}</label>
         <select id="tgtType">
-          <option value="none" ${!c.target?'selected':''}>Brak celu</option>
-          <option value="monthly" ${c.target&&c.target.type==='monthly'?'selected':''}>Odkładaj co miesiąc</option>
-          <option value="balance" ${c.target&&c.target.type==='balance'?'selected':''}>Uzbieraj saldo</option>
+          <option value="none" ${!c.target?'selected':''}>${T('target_none')}</option>
+          <option value="monthly" ${c.target&&c.target.type==='monthly'?'selected':''}>${T('target_monthly')}</option>
+          <option value="balance" ${c.target&&c.target.type==='balance'?'selected':''}>${T('target_balance')}</option>
         </select></div>
-      <div class="field" id="tgtAmtField" style="${c.target?'':'display:none'}"><label>Kwota (zł)</label>
-        <input id="tgtAmt" type="text" value="${c.target?(c.target.amount/100).toFixed(2).replace('.',','):''}" placeholder="np. 500"></div>
-      <button class="mini-btn" id="saveTgt">Zapisz cel</button>
-      ${ti.state!=='none'?`<div class="tgt-txt" style="margin-top:8px">${ti.state==='funded'?'✓ Cel osiągnięty':`Brakuje ${fmt(ti.needed-ti.funded)}`}</div>`:''}
+      <div class="field" id="tgtAmtField" style="${c.target?'':'display:none'}"><label>${T('amount_zl')}</label>
+        <input id="tgtAmt" type="text" value="${c.target?(c.target.amount/100).toFixed(2).replace('.',','):''}" placeholder="500"></div>
+      <button class="mini-btn" id="saveTgt">${T('save_target')}</button>
+      ${ti.state!=='none'?`<div class="tgt-txt" style="margin-top:8px">${ti.state==='funded'?T('target_met'):T('target_short',fmt(ti.needed-ti.funded))}</div>`:''}
     </div>
 
     <div class="insp-sec">
-      <h4>Przenieś pieniądze</h4>
+      <h4>${T('move_money')}</h4>
       <div class="row2">
-        <div class="field"><label>Kwota</label><input id="mvAmt" type="text" placeholder="0,00"></div>
-        <div class="field"><label>Kierunek</label>
-          <select id="mvDir"><option value="to">Do tej kat.</option><option value="from">Z tej kat.</option></select></div>
+        <div class="field"><label>${T('amount')}</label><input id="mvAmt" type="text" placeholder="0,00"></div>
+        <div class="field"><label>${T('direction')}</label>
+          <select id="mvDir"><option value="to">${T('to_this_cat')}</option><option value="from">${T('from_this_cat')}</option></select></div>
       </div>
-      <div class="field"><label>Druga kategoria</label>
-        <select id="mvCat"><option value="__rta__">Do przypisania</option>${otherCats.map(x=>`<option value="${x.id}">${x.groupName} › ${x.name}</option>`).join('')}</select></div>
-      <button class="mini-btn ghost" id="doMove">Przenieś</button>
+      <div class="field"><label>${T('other_category')}</label>
+        <select id="mvCat"><option value="__rta__">${T('rta_opt')}</option>${otherCats.map(x=>`<option value="${x.id}">${x.groupName} › ${x.name}</option>`).join('')}</select></div>
+      <button class="mini-btn ghost" id="doMove">${T('move')}</button>
     </div>
-    <a class="link-btn" id="delCat">Usuń kategorię</a>`;
+    <a class="link-btn" id="delCat">${T('delete_category')}</a>`;
 
+  const scBtn=el.querySelector('[data-sheetclose]'); if(scBtn) scBtn.onclick=()=>{ui.selCat=null;render();};
   el.querySelector('#tgtType').onchange=e=>{el.querySelector('#tgtAmtField').style.display=e.target.value==='none'?'none':'block';};
   el.querySelector('#saveTgt').onclick=()=>{
     const type=el.querySelector('#tgtType').value;
     if(type==='none') c.target=null;
     else c.target={type,amount:parseAmt(el.querySelector('#tgtAmt').value)};
-    toast('Cel zapisany'); render();
+    toast(T('target_saved')); render();
   };
   el.querySelector('#doMove').onclick=()=>{
-    const amt=parseAmt(el.querySelector('#mvAmt').value); if(!amt){toast('Podaj kwotę');return;}
+    const amt=parseAmt(el.querySelector('#mvAmt').value); if(!amt){toast(T('enter_amount'));return;}
     const dir=el.querySelector('#mvDir').value, other=el.querySelector('#mvCat').value;
-    moveMoney(c.id, other, amt, dir); toast('Przeniesiono '+fmt(amt)); render();
+    moveMoney(c.id, other, amt, dir); toast(T('moved',fmt(amt))); render();
   };
-  el.querySelector('#delCat').onclick=()=>{ if(confirm('Usunąć kategorię? Transakcje pozostaną bez kategorii.')) deleteCategory(c.id); };
+  el.querySelector('#delCat').onclick=()=>{ if(confirm(T('del_cat_confirm'))) deleteCategory(c.id); };
   return el;
 }
 
@@ -783,10 +1028,10 @@ function deleteCategory(catId){
 /* ---------- ACCOUNTS / TRANSACTIONS ---------- */
 function catCell(t){
   if(t.type==='transfer') return `<span class="pill-cat transfer">⇄ ${acctName(t.transferAccountId)}</span>`;
-  if(t.type==='pocket'){ const p=pocketById(t.pocketId); return `<span class="pill-cat pocket">▣ ${p?p.name:'Podkonto'}</span>`; }
-  if(t.categoryId===RTA()) return '<span class="pill-cat income">Przychód</span>';
+  if(t.type==='pocket'){ const p=pocketById(t.pocketId); return `<span class="pill-cat pocket">▣ ${p?p.name:T('pocket')}</span>`; }
+  if(t.categoryId===RTA()) return `<span class="pill-cat income">${T('pill_income')}</span>`;
   if(t.categoryId){ const c=catById(t.categoryId); return `<span class="pill-cat">${c?c.name:'—'}</span>`; }
-  return '<span class="pill-cat">Bez kategorii</span>';
+  return `<span class="pill-cat">${T('pill_uncat')}</span>`;
 }
 function accountsView(){
   const el=document.createElement('div'); el.className='budget-wrap';
@@ -801,48 +1046,54 @@ function accountsView(){
   const outflow = flow.filter(t=>t.amount<0).reduce((s,t)=>s+t.amount,0);
   const net = inflow+outflow;
   const summary = `<div class="flow-summary">
-    <div class="flow-card in"><div class="fl">↑ Wpływy</div><div class="fv">${fmt(inflow)}</div></div>
-    <div class="flow-card out"><div class="fl">↓ Wydatki</div><div class="fv">${fmt(outflow)}</div></div>
-    <div class="flow-card"><div class="fl">Bilans · ${keyToLabel(ui.month)}</div><div class="fv" style="color:${net>0?'var(--green)':net<0?'var(--red)':'var(--ink)'}">${fmt(net)}</div></div>
+    <div class="flow-card in"><div class="fl">↑ ${T('inflow')}</div><div class="fv">${fmt(inflow)}</div></div>
+    <div class="flow-card out"><div class="fl">↓ ${T('outflow')}</div><div class="fv">${fmt(outflow)}</div></div>
+    <div class="flow-card"><div class="fl">${T('flow_balance')} · ${keyToLabel(ui.month)}</div><div class="fv" style="color:${net>0?'var(--green)':net<0?'var(--red)':'var(--ink)'}">${fmt(net)}</div></div>
   </div>`;
   const chooser = `<select id="acctChooser" class="btn ghost" style="padding:6px 10px">
-      <option value="all" ${ui.selAcct==='all'?'selected':''}>Wszystkie konta</option>
+      <option value="all" ${ui.selAcct==='all'?'selected':''}>${T('all_accounts')}</option>
       ${state.accounts.map(a=>`<option value="${a.id}" ${ui.selAcct===a.id?'selected':''}>${a.name}</option>`).join('')}</select>`;
   const wrap=document.createElement('div'); wrap.className='txn-wrap';
   wrap.innerHTML=`
     <div class="txn-head">
       <div>${chooser}</div><div style="flex:1"></div>
-      <div style="text-align:right"><div style="font-size:.72rem;color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:.05em">${acct?'Saldo':'Wartość netto'}</div>
+      ${acct?`<button class="btn ghost mobile-only" id="acctDetailsBtn" style="padding:6px 10px">${T('details')}</button>`:''}
+      <div style="text-align:right"><div style="font-size:.72rem;color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:.05em">${acct?T('balance'):T('net_worth')}</div>
       <div class="bal" style="font-size:1.2rem;color:${bal<0?'var(--red)':'var(--ink)'}">${fmt(bal)}</div></div>
     </div>
     ${summary}
     <table class="txn-table"><thead><tr>
-      <th>Data</th><th>Odbiorca</th><th>Kategoria</th>${acct?'':'<th>Konto</th>'}<th style="text-align:right">Kwota</th><th style="width:64px"></th>
+      <th>${T('col_date')}</th><th>${T('col_payee')}</th><th>${T('col_category')}</th>${acct?'':`<th>${T('col_account')}</th>`}<th style="text-align:right">${T('col_amount')}</th><th style="width:64px"></th>
     </tr></thead><tbody>
     ${txns.map(t=>{
       const cat = catCell(t);
       const an = state.accounts.find(a=>a.id===t.accountId);
       const editable = t.type!=='transfer' && t.type!=='pocket';
-      return `<tr>
+      return `<tr data-txnrow="${t.id}">
         <td>${t.date}</td><td>${t.payee}</td><td>${cat}</td>
         ${acct?'':`<td style="color:var(--ink-soft)">${an?an.name:''}</td>`}
         <td class="amt ${t.amount>0?'in':''}">${fmt(t.amount)}</td>
-        <td class="txn-actions">${editable?`<button class="tx-edit" data-txedit="${t.id}" title="Edytuj">✎</button>`:''}<button class="tx-del" data-txdel="${t.id}" title="Usuń">✕</button></td></tr>`;
-    }).join('')||`<tr><td colspan="${acct?5:6}" style="text-align:center;color:var(--ink-soft);padding:30px">Brak transakcji w tym miesiącu</td></tr>`}
+        <td class="txn-actions">${editable?`<button class="tx-edit" data-txedit="${t.id}" title="${T('edit')}">✎</button>`:''}<button class="tx-del" data-txdel="${t.id}" title="${T('delete')}">✕</button></td></tr>`;
+    }).join('')||`<tr><td colspan="${acct?5:6}" style="text-align:center;color:var(--ink-soft);padding:30px">${T('no_txn_month')}</td></tr>`}
     </tbody></table>`;
   el.append(wrap);
-  wrap.querySelector('#acctChooser').onchange=e=>{ui.selAcct=e.target.value;render();};
+  wrap.querySelector('#acctChooser').onchange=e=>{ui.selAcct=e.target.value;ui.acctSheet=false;render();};
+  const adBtn=wrap.querySelector('#acctDetailsBtn'); if(adBtn) adBtn.onclick=()=>{ui.acctSheet=true;render();};
   wrap.querySelectorAll('[data-txedit]').forEach(b=>b.onclick=()=>openEditTxn(b.dataset.txedit));
-  wrap.querySelectorAll('[data-txdel]').forEach(b=>b.onclick=()=>{ if(confirm('Usunąć tę transakcję?')) deleteTransaction(b.dataset.txdel); });
+  wrap.querySelectorAll('[data-txdel]').forEach(b=>b.onclick=()=>{ if(confirm(T('del_txn_confirm'))) deleteTransaction(b.dataset.txdel); });
+  wrap.querySelectorAll('[data-txnrow]').forEach(tr=>tr.onclick=e=>{        // mobile: tap a row to edit (actions column is hidden)
+    if(!window.matchMedia('(max-width:768px)').matches) return;
+    if(e.target.closest('button')) return;
+    openEditTxn(tr.dataset.txnrow);
+  });
   return el;
 }
 
 /* Read-only account details side panel (opens the edit modal) */
 function accountDetailsPanel(){
   const el=document.createElement('div'); el.className='inspector';
-  const TYPE={checking:'Konto osobiste',savings:'Konto oszczędnościowe',cash:'Gotówka',credit:'Karta kredytowa',tracking:'Konto śledzone'};
   if(ui.selAcct==='all'){
-    el.innerHTML=`<div class="insp-empty"><div class="ico">🏦</div>Wybierz konto z listy lub paska bocznego, aby zobaczyć szczegóły.</div>`;
+    el.innerHTML=`<div class="insp-empty"><div class="ico">🏦</div>${T('pick_account')}</div>`;
     return el;
   }
   const a=state.accounts.find(x=>x.id===ui.selAcct); if(!a){ ui.selAcct='all'; return accountDetailsPanel(); }
@@ -851,63 +1102,76 @@ function accountDetailsPanel(){
   const row=(l,v,color)=>`<div class="d-row"><span class="d-l">${l}</span><span class="d-v" ${color?`style="color:${color}"`:''}>${v}</span></div>`;
   let body='';
   if(a.type==='credit'){
-    body+=row('Saldo zadłużenia', fmt(debtOf(a)), debtOf(a)>0?'var(--red)':null);
-    body+=row('Dostępne środki', fmt(availableFunds(a)), sc(availableFunds(a)));
-    body+=row('Limit kredytowy', fmt(a.creditLimit||0));
+    body+=row(T('debt_balance'), fmt(debtOf(a)), debtOf(a)>0?'var(--red)':null);
+    body+=row(T('available_funds'), fmt(availableFunds(a)), sc(availableFunds(a)));
+    body+=row(T('credit_limit'), fmt(a.creditLimit||0));
   } else if(showLimit(a.type)){
-    body+=row('Dostępne środki', fmt(availableFunds(a)), sc(availableFunds(a)));
-    if(a.creditLimit) body+=row('Limit kredytowy', fmt(a.creditLimit));
+    body+=row(T('available_funds'), fmt(availableFunds(a)), sc(availableFunds(a)));
+    if(a.creditLimit) body+=row(T('credit_limit'), fmt(a.creditLimit));
   }
   let pocketsHtml='';
   if(hasExtras(a.type) && a.pockets && a.pockets.length){
     const sum=a.pockets.reduce((s,p)=>s+pocketBalance(p.id),0), free=bal-sum;
-    pocketsHtml=`<div class="insp-sec"><h4>Podkonta</h4>
+    pocketsHtml=`<div class="insp-sec"><h4>${T('pockets')}</h4>
       ${row(a.name, fmt(free), free<0?'var(--red)':null)}
-      ${a.pockets.map(p=>row(p.name||'Podkonto', fmt(pocketBalance(p.id)))).join('')}</div>`;
+      ${a.pockets.map(p=>row(p.name||T('pocket'), fmt(pocketBalance(p.id)))).join('')}</div>`;
   }
+  if(ui.acctSheet) el.classList.add('sheet-open');
   el.innerHTML=`
+    <div class="sheet-close"><button data-sheetclose>✕</button></div>
     <div class="insp-title">${a.name}</div>
     <div class="insp-head-meta">
-      <div class="insp-sub" style="margin:0">${TYPE[a.type]||a.type}</div>
+      <div class="insp-sub" style="margin:0">${acctTypeLabel(a.type)}</div>
       ${a.number?`<div class="insp-num">${a.number}</div>`:''}
     </div>
-    <div class="insp-avail"><div class="v" style="color:${sc(bal)||'var(--ink)'}">${fmt(bal)}</div><div class="l">Saldo</div></div>
+    <div class="insp-avail"><div class="v" style="color:${sc(bal)||'var(--ink)'}">${fmt(bal)}</div><div class="l">${T('balance')}</div></div>
     ${body?`<div class="insp-sec">${body}</div>`:''}
     ${pocketsHtml}
-    <button class="mini-btn" id="editAcctBtn2" style="margin-top:16px">✎ Edytuj konto</button>`;
+    <button class="mini-btn" id="editAcctBtn2" style="margin-top:16px">${T('edit_account')}</button>`;
   el.querySelector('#editAcctBtn2').onclick=()=>openEditAccount(a.id);
+  const scBtn=el.querySelector('[data-sheetclose]'); if(scBtn) scBtn.onclick=()=>{ui.acctSheet=false;render();};
   return el;
 }
 
-/* ---------- REPORTS ---------- */
-function reportsView(){
-  const el=document.createElement('div'); el.style.maxWidth='980px';el.style.margin='0 auto';
-  const m=ui.month;
+/* ---------- DASHBOARD / KONTA / REPORTS ---------- */
+function monthStats(m){
   const income = state.transactions.filter(t=>txnMonth(t)===m && t.amount>0 && t.categoryId===RTA() && !t.starting).reduce((s,t)=>s+t.amount,0);
   const spendByCat={};
-  state.transactions.filter(t=>txnMonth(t)===m && t.categoryId && t.categoryId!==RTA()).forEach(t=>{
-    spendByCat[t.categoryId]=(spendByCat[t.categoryId]||0)+t.amount;
-  });
-  const spend = Object.values(spendByCat).reduce((s,v)=>s+v,0); // negative
+  state.transactions.filter(t=>txnMonth(t)===m && t.categoryId && t.categoryId!==RTA()).forEach(t=>{ spendByCat[t.categoryId]=(spendByCat[t.categoryId]||0)+t.amount; });
+  const spend = Object.values(spendByCat).reduce((s,v)=>s+v,0);   // negative
+  return {income, spend, spendByCat};
+}
+function dashboardView(){
+  const el=document.createElement('div'); el.style.maxWidth='980px'; el.style.margin='0 auto';
+  const m=ui.month; const {income,spend}=monthStats(m);
+  el.innerHTML=`
+    <div class="cards">
+      <div class="card"><div class="l">${T('dash_income')} (${keyToLabel(m).split(' ')[0]})</div><div class="v green">${fmt(income)}</div></div>
+      <div class="card"><div class="l">${T('dash_expenses')}</div><div class="v red">${fmt(spend)}</div></div>
+      <div class="card"><div class="l">${T('dash_month_balance')}</div><div class="v ${income+spend>=0?'green':'red'}">${fmt(income+spend)}</div></div>
+      <div class="card"><div class="l">${T('dash_net_worth')}</div><div class="v">${fmt(netWorth())}</div></div>
+    </div>`;
+  return el;
+}
+function kontaView(){
+  const el=document.createElement('div'); el.style.maxWidth='980px'; el.style.margin='0 auto';
+  el.innerHTML=`<div class="rep-panel"><h3>${T('account_balances')}</h3>
+    ${state.accounts.map(a=>{const b=acctBalance(a.id);return `<div class="spend-row"><div class="nm">${a.name}</div>
+      <div class="bar" style="background:transparent"></div><div class="amt" style="color:${b<0?'var(--red)':'var(--ink)'}">${fmt(b)}</div></div>`;}).join('')}
+  </div>`;
+  return el;
+}
+function reportsView(){
+  const el=document.createElement('div'); el.style.maxWidth='980px'; el.style.margin='0 auto';
+  const m=ui.month; const {spendByCat}=monthStats(m);
   const rows = Object.entries(spendByCat).map(([id,v])=>({name:catById(id)?catById(id).name:'—',amt:-v}))
     .filter(r=>r.amt>0).sort((a,b)=>b.amt-a.amt);
   const maxSpend=Math.max(1,...rows.map(r=>r.amt));
-  el.innerHTML=`
-    <div class="cards">
-      <div class="card"><div class="l">Przychód (${keyToLabel(m).split(' ')[0]})</div><div class="v green">${fmt(income)}</div></div>
-      <div class="card"><div class="l">Wydatki</div><div class="v red">${fmt(spend)}</div></div>
-      <div class="card"><div class="l">Bilans miesiąca</div><div class="v ${income+spend>=0?'green':'red'}">${fmt(income+spend)}</div></div>
-      <div class="card"><div class="l">Wartość netto</div><div class="v">${fmt(netWorth())}</div></div>
-    </div>
-    <div class="rep-panel"><h3>Wydatki wg kategorii — ${keyToLabel(m)}</h3>
-      ${rows.length?rows.map(r=>`<div class="spend-row"><div class="nm">${r.name}</div>
-        <div class="bar"><i style="width:${Math.round(r.amt/maxSpend*100)}%"></i></div>
-        <div class="amt">${fmt(r.amt)}</div></div>`).join(''):'<div style="color:var(--ink-soft)">Brak wydatków w tym miesiącu.</div>'}
-    </div>
-    <div class="rep-panel"><h3>Salda kont</h3>
-      ${state.accounts.map(a=>{const b=acctBalance(a.id);return `<div class="spend-row"><div class="nm">${a.name}</div>
-        <div class="bar" style="background:transparent"></div><div class="amt" style="color:${b<0?'var(--red)':'var(--ink)'}">${fmt(b)}</div></div>`;}).join('')}
-    </div>`;
+  el.innerHTML=`<div class="rep-panel"><h3>${T('spending_by_cat')} — ${keyToLabel(m)}</h3>
+    ${rows.length?rows.map(r=>`<div class="spend-row"><div class="nm">${r.name}</div>
+      <div class="bar"><i style="width:${Math.round(r.amt/maxSpend*100)}%"></i></div>
+      <div class="amt">${fmt(r.amt)}</div></div>`).join(''):`<div style="color:var(--ink-soft)">${T('no_expenses')}</div>`}
+  </div>`;
   return el;
 }
 
@@ -922,24 +1186,24 @@ overlay.onclick=e=>{if(e.target===overlay)closeModal();};
 
 function openAddTxn(){
   const cats=allCats();
-  openModal(`<div class="modal"><div class="modal-h"><h3>Nowa transakcja</h3><button class="x" data-close>×</button></div>
+  openModal(`<div class="modal"><div class="modal-h"><h3>${T('new_txn')}</h3><button class="x" data-close>×</button></div>
     <div class="modal-b">
-      <div class="seg"><button class="on" id="segOut">Wydatek</button><button id="segIn">Przychód</button><button id="segTr">Przelew</button></div>
+      <div class="seg"><button class="on" id="segOut">${T('expense')}</button><button id="segIn">${T('income')}</button><button id="segTr">${T('transfer')}</button></div>
       <div id="normalFields">
-        <div class="field"><label>Konto</label><select id="txAcct">${state.accounts.filter(a=>a.onBudget).map(a=>`<option value="${a.id}">${a.name}</option>`).join('')}</select></div>
+        <div class="field"><label>${T('account')}</label><select id="txAcct">${state.accounts.filter(a=>a.onBudget).map(a=>`<option value="${a.id}">${a.name}</option>`).join('')}</select></div>
       </div>
       <div id="transferFields" style="display:none">
-        <div class="field"><label>Z (konto / podkonto)</label><select id="txFrom">${endpointOptions()}</select></div>
-        <div class="field"><label>Do (konto / podkonto)</label><select id="txTo">${endpointOptions()}</select></div>
+        <div class="field"><label>${T('from_ep')}</label><select id="txFrom">${endpointOptions()}</select></div>
+        <div class="field"><label>${T('to_ep')}</label><select id="txTo">${endpointOptions()}</select></div>
       </div>
       <div class="row2">
-        <div class="field"><label>Data</label><input id="txDate" type="date" value="${ui.month}-15"></div>
-        <div class="field"><label>Kwota (zł)</label><input id="txAmt" type="text" placeholder="0,00"></div>
+        <div class="field"><label>${T('date')}</label><input id="txDate" type="date" value="${ui.month}-15"></div>
+        <div class="field"><label>${T('amount_zl')}</label><input id="txAmt" type="text" placeholder="0,00"></div>
       </div>
-      <div class="field" id="txPayeeField"><label>Odbiorca / opis</label><input id="txPayee" type="text" placeholder="np. Biedronka"></div>
-      <div class="field" id="txCatField"><label>Kategoria</label><select id="txCat">${cats.map(c=>`<option value="${c.id}">${c.groupName} › ${c.name}</option>`).join('')}</select></div>
+      <div class="field" id="txPayeeField"><label>${T('payee_note')}</label><input id="txPayee" type="text" placeholder="${T('payee_ph')}"></div>
+      <div class="field" id="txCatField"><label>${T('category')}</label><select id="txCat">${cats.map(c=>`<option value="${c.id}">${c.groupName} › ${c.name}</option>`).join('')}</select></div>
     </div>
-    <div class="modal-f"><button class="btn ghost" data-close>Anuluj</button><button class="btn" id="txSave">Zapisz</button></div></div>`);
+    <div class="modal-f"><button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="txSave">${T('save')}</button></div></div>`);
   const $=s=>modalHost.querySelector(s);
   let type='out';
   const setSeg=t=>{ type=t;
@@ -951,41 +1215,41 @@ function openAddTxn(){
   };
   $('#segOut').onclick=()=>setSeg('out'); $('#segIn').onclick=()=>setSeg('in'); $('#segTr').onclick=()=>setSeg('tr');
   $('#txSave').onclick=()=>{
-    const amt=parseAmt($('#txAmt').value); if(!amt){toast('Podaj kwotę');return;}
+    const amt=parseAmt($('#txAmt').value); if(!amt){toast(T('enter_amount'));return;}
     const date=$('#txDate').value;
     if(type==='tr'){
       const from=parseEp($('#txFrom').value), to=parseEp($('#txTo').value);
-      if(from.accountId===to.accountId && (from.pocketId||null)===(to.pocketId||null)){toast('Wybierz różne miejsca');return;}
-      doTransfer(from,to,amt,date); closeModal(); toast('Przelew wykonany'); render(); return;
+      if(from.accountId===to.accountId && (from.pocketId||null)===(to.pocketId||null)){toast(T('diff_places'));return;}
+      doTransfer(from,to,amt,date); closeModal(); toast(T('transfer_done')); render(); return;
     }
     state.transactions.push({id:uid('t'),seq:nextSeq(),date,accountId:$('#txAcct').value,
-      payee:$('#txPayee').value||'(bez nazwy)',
+      payee:$('#txPayee').value||T('unnamed'),
       categoryId: type==='in'?RTA():$('#txCat').value,
       amount: type==='in'?amt:-amt, memo:'', cleared:false});
-    closeModal(); toast('Dodano transakcję'); render();
+    closeModal(); toast(T('txn_added')); render();
   };
 }
 
 // Edit an existing normal (expense/income) transaction
 function openEditTxn(id){
   const t=state.transactions.find(x=>x.id===id); if(!t) return;
-  if(t.type==='transfer'||t.type==='pocket'){ toast('Przelewy edytuj przez usunięcie i dodanie'); return; }
+  if(t.type==='transfer'||t.type==='pocket'){ toast(T('transfer_edit_note')); return; }
   const cats=allCats();
   const grosz=g=>g?(g/100).toFixed(2).replace('.',','):'';
-  openModal(`<div class="modal"><div class="modal-h"><h3>Edytuj transakcję</h3><button class="x" data-close>×</button></div>
+  openModal(`<div class="modal"><div class="modal-h"><h3>${T('edit_txn')}</h3><button class="x" data-close>×</button></div>
     <div class="modal-b">
-      <div class="seg"><button id="segOut">Wydatek</button><button id="segIn">Przychód</button></div>
-      <div class="field"><label>Konto</label><select id="txAcct">${state.accounts.map(a=>`<option value="${a.id}" ${t.accountId===a.id?'selected':''}>${a.name}</option>`).join('')}</select></div>
+      <div class="seg"><button id="segOut">${T('expense')}</button><button id="segIn">${T('income')}</button></div>
+      <div class="field"><label>${T('account')}</label><select id="txAcct">${state.accounts.map(a=>`<option value="${a.id}" ${t.accountId===a.id?'selected':''}>${a.name}</option>`).join('')}</select></div>
       <div class="row2">
-        <div class="field"><label>Data</label><input id="txDate" type="date" value="${t.date}"></div>
-        <div class="field"><label>Kwota (zł)</label><input id="txAmt" type="text" value="${grosz(Math.abs(t.amount))}"></div>
+        <div class="field"><label>${T('date')}</label><input id="txDate" type="date" value="${t.date}"></div>
+        <div class="field"><label>${T('amount_zl')}</label><input id="txAmt" type="text" value="${grosz(Math.abs(t.amount))}"></div>
       </div>
-      <div class="field"><label>Odbiorca / opis</label><input id="txPayee" type="text" value="${(t.payee||'').replace(/"/g,'&quot;')}"></div>
-      <div class="field" id="txCatField"><label>Kategoria</label><select id="txCat">${cats.map(c=>`<option value="${c.id}" ${t.categoryId===c.id?'selected':''}>${c.groupName} › ${c.name}</option>`).join('')}</select></div>
+      <div class="field"><label>${T('payee_note')}</label><input id="txPayee" type="text" value="${(t.payee||'').replace(/"/g,'&quot;')}"></div>
+      <div class="field" id="txCatField"><label>${T('category')}</label><select id="txCat">${cats.map(c=>`<option value="${c.id}" ${t.categoryId===c.id?'selected':''}>${c.groupName} › ${c.name}</option>`).join('')}</select></div>
     </div>
     <div class="modal-f">
-      <button class="mini-btn" id="txDel" style="background:none;color:var(--red);width:auto;margin:0 auto 0 0;padding:8px 2px">Usuń</button>
-      <button class="btn ghost" data-close>Anuluj</button><button class="btn" id="txSave">Zapisz</button></div></div>`);
+      <button class="mini-btn" id="txDel" style="background:none;color:var(--red);width:auto;margin:0 auto 0 0;padding:8px 2px">${T('delete')}</button>
+      <button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="txSave">${T('save')}</button></div></div>`);
   const $=s=>modalHost.querySelector(s);
   let type = t.categoryId===RTA() ? 'in' : 'out';
   const setSeg=k=>{ type=k;
@@ -995,20 +1259,19 @@ function openEditTxn(id){
   setSeg(type);
   $('#segOut').onclick=()=>setSeg('out'); $('#segIn').onclick=()=>setSeg('in');
   $('#txSave').onclick=()=>{
-    const amt=parseAmt($('#txAmt').value); if(!amt){toast('Podaj kwotę');return;}
+    const amt=parseAmt($('#txAmt').value); if(!amt){toast(T('enter_amount'));return;}
     t.date=$('#txDate').value;
     t.accountId=$('#txAcct').value;
-    t.payee=$('#txPayee').value||'(bez nazwy)';
+    t.payee=$('#txPayee').value||T('unnamed');
     t.categoryId = type==='in' ? RTA() : $('#txCat').value;
     t.amount = type==='in' ? amt : -amt;
-    closeModal(); toast('Zapisano zmiany'); render();
+    closeModal(); toast(T('changes_saved')); render();
   };
-  $('#txDel').onclick=()=>{ if(confirm('Usunąć tę transakcję?')){ closeModal(); deleteTransaction(t.id); } };
+  $('#txDel').onclick=()=>{ if(confirm(T('del_txn_confirm'))){ closeModal(); deleteTransaction(t.id); } };
 }
 function typeOptions(sel){
-  return [['checking','Konto osobiste'],['savings','Oszczędnościowe'],['cash','Gotówka'],
-    ['credit','Karta kredytowa'],['tracking','Śledzone (inwestycje / kredyt)']]
-    .map(([v,l])=>`<option value="${v}" ${sel===v?'selected':''}>${l}</option>`).join('');
+  return ['checking','savings','cash','credit','tracking']
+    .map(v=>`<option value="${v}" ${sel===v?'selected':''}>${acctTypeLabel(v)}</option>`).join('');
 }
 const hasExtras = t => t==='checking'||t==='savings';
 const showLimit = t => t==='credit'||t==='checking'||t==='savings';
@@ -1024,9 +1287,9 @@ function makePlIban(bban24){ return formatNRB(nrbCheckDigits(bban24)+bban24); }
 function validateNRB(raw){
   let s=raw.replace(/\s+/g,'').toUpperCase();
   if(s.startsWith('PL')) s=s.slice(2);
-  if(!/^\d{26}$/.test(s)) return {ok:false,msg:'Numer rachunku musi mieć 26 cyfr (opcjonalnie z prefiksem PL).'};
+  if(!/^\d{26}$/.test(s)) return {ok:false,msg:T('nrb_len')};
   let r=0; for(const ch of (s.slice(2)+'2521'+s.slice(0,2))) r=(r*10+(+ch))%97;
-  if(r!==1) return {ok:false,msg:'Nieprawidłowa suma kontrolna numeru rachunku (NRB).'};
+  if(r!==1) return {ok:false,msg:T('nrb_checksum')};
   return {ok:true, formatted:formatNRB(s)};
 }
 // live formatting while typing: optional PL prefix, then 2 check digits, then groups of 4
@@ -1047,23 +1310,23 @@ function reformatWithCaret(el, fn){
   try{ el.setSelectionRange(idx,idx); }catch(e){}
 }
 function openAddAccount(){
-  openModal(`<div class="modal"><div class="modal-h"><h3>Nowe konto</h3><button class="x" data-close>×</button></div>
+  openModal(`<div class="modal"><div class="modal-h"><h3>${T('new_account')}</h3><button class="x" data-close>×</button></div>
     <div class="modal-b">
-      <div class="field"><label>Nazwa</label><input id="acName" type="text" placeholder="np. Konto wspólne"></div>
-      <div class="field"><label>Typ</label><select id="acType">${typeOptions('checking')}</select></div>
-      <div class="field" id="acNumberField"><label>Numer konta (opcjonalnie)</label><input id="acNumber" type="text">
+      <div class="field"><label>${T('name')}</label><input id="acName" type="text"></div>
+      <div class="field"><label>${T('type')}</label><select id="acType">${typeOptions('checking')}</select></div>
+      <div class="field" id="acNumberField"><label>${T('account_number_opt')}</label><input id="acNumber" type="text">
         <div class="field-err" id="acNumErr" style="display:none"></div></div>
-      <div class="field" id="acLimitField"><label>Limit kredytowy (zł)</label><input id="acLimit" type="text" placeholder="0,00"></div>
-      <div class="field"><label>Saldo początkowe (zł)</label><input id="acBal" type="text" placeholder="0,00"></div>
+      <div class="field" id="acLimitField"><label>${T('credit_limit')} (zł)</label><input id="acLimit" type="text" placeholder="0,00"></div>
+      <div class="field"><label>${T('starting_balance')}</label><input id="acBal" type="text" placeholder="0,00"></div>
     </div>
-    <div class="modal-f"><button class="btn ghost" data-close>Anuluj</button><button class="btn" id="acSave">Dodaj</button></div></div>`);
+    <div class="modal-f"><button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="acSave">${T('add')}</button></div></div>`);
   const typeSel=modalHost.querySelector('#acType'), limitField=modalHost.querySelector('#acLimitField');
   typeSel.onchange=()=>{limitField.style.display=showLimit(typeSel.value)?'block':'none';
     modalHost.querySelector('#acNumberField').style.display=typeSel.value==='cash'?'none':'block';};
   modalHost.querySelector('#acNumber').oninput=()=>{modalHost.querySelector('#acNumErr').style.display='none';
     const t=typeSel.value; if(t==='checking'||t==='savings') reformatWithCaret(modalHost.querySelector('#acNumber'), formatNRBInput);};
   modalHost.querySelector('#acSave').onclick=()=>{
-    const name=modalHost.querySelector('#acName').value.trim(); if(!name){toast('Podaj nazwę');return;}
+    const name=modalHost.querySelector('#acName').value.trim(); if(!name){toast(T('enter_name'));return;}
     const type=typeSel.value, onBudget=type!=='tracking';
     const bal=parseAmt(modalHost.querySelector('#acBal').value);
     let number=type==='cash'?'':modalHost.querySelector('#acNumber').value.trim();
@@ -1075,9 +1338,9 @@ function openAddAccount(){
     const a={id:uid('a'),name,type,onBudget,number,
       creditLimit:showLimit(type)?parseAmt(modalHost.querySelector('#acLimit').value):0, pockets:[]};
     state.accounts.push(a);
-    if(bal) state.transactions.push({id:uid('t'),seq:nextSeq(),date:ui.month+'-01',accountId:a.id,payee:'Saldo początkowe',
+    if(bal) state.transactions.push({id:uid('t'),seq:nextSeq(),date:ui.month+'-01',accountId:a.id,payee:T('starting_balance_payee'),
       categoryId:onBudget?RTA():null,amount:bal,memo:'',cleared:true,starting:true});
-    closeModal(); toast('Dodano konto'); render();
+    closeModal(); toast(T('account_added')); render();
   };
 }
 
@@ -1088,26 +1351,26 @@ function openEditAccount(id){
   let pk=(a.pockets||[]).map(p=>({id:p.id,name:p.name,amount:pocketBalance(p.id)}));
   const nTxn=state.transactions.filter(t=>t.accountId===a.id && t.type!=='pocket').length;
 
-  openModal(`<div class="modal"><div class="modal-h"><h3>Edytuj konto</h3><button class="x" data-close>×</button></div>
+  openModal(`<div class="modal"><div class="modal-h"><h3>${T('edit_account_title')}</h3><button class="x" data-close>×</button></div>
     <div class="modal-b modal-scroll">
-      <div class="field"><label>Nazwa konta</label><input id="eName" type="text" value="${esc(a.name)}"></div>
-      <div class="field"><label>Typ konta</label><select id="eType">${typeOptions(a.type)}</select></div>
-      <div class="field" id="numberField" style="${a.type==='cash'?'display:none':''}"><label>Numer konta</label><input id="eNumber" type="text" value="${esc(a.number)}">
+      <div class="field"><label>${T('account_name')}</label><input id="eName" type="text" value="${esc(a.name)}"></div>
+      <div class="field"><label>${T('account_type')}</label><select id="eType">${typeOptions(a.type)}</select></div>
+      <div class="field" id="numberField" style="${a.type==='cash'?'display:none':''}"><label>${T('account_number')}</label><input id="eNumber" type="text" value="${esc(a.number)}">
         <div class="field-err" id="numErr" style="display:none"></div></div>
 
       <div id="limitBlock" class="insp-sec" style="${showLimit(a.type)?'':'display:none'}">
-        <div class="field"><label>Limit kredytowy (zł)</label>
+        <div class="field"><label>${T('credit_limit')} (zł)</label>
           <input id="eLimit" type="text" value="${grosz(a.creditLimit)}" placeholder="0,00"></div>
       </div>
 
       <div id="pocketsBlock" class="insp-sec" style="${hasExtras(a.type)?'':'display:none'}">
-        <h4>Podkonta (pockets)</h4><div id="pkList"></div>
-        <button class="mini-btn ghost" id="addPk">+ Dodaj podkonto</button>
+        <h4>${T('pockets')}</h4><div id="pkList"></div>
+        <button class="mini-btn ghost" id="addPk">${T('add_pocket')}</button>
       </div>
     </div>
     <div class="modal-f">
-      <button class="mini-btn" id="delAcct" style="background:none;color:var(--red);width:auto;margin:0 auto 0 0;padding:8px 2px">Usuń konto${nTxn?` (${nTxn} transakcji)`:''}</button>
-      <button class="btn ghost" data-close>Anuluj</button><button class="btn" id="eSave">Zapisz</button></div></div>`);
+      <button class="mini-btn" id="delAcct" style="background:none;color:var(--red);width:auto;margin:0 auto 0 0;padding:8px 2px">${T('delete_account')}${nTxn?T('del_account_n',nTxn):''}</button>
+      <button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="eSave">${T('save')}</button></div></div>`);
 
   const $=s=>modalHost.querySelector(s);
   const typeSel=$('#eType'), pkList=$('#pkList');
@@ -1127,17 +1390,17 @@ function openEditAccount(id){
   };
   const renderPk=()=>{
     pkList.innerHTML = pk.length ? pk.map((p,i)=>`<div class="pk-row">
-        <input class="pk-name" data-i="${i}" value="${(p.name||'').replace(/"/g,'&quot;')}" placeholder="Nazwa podkonta">
+        <input class="pk-name" data-i="${i}" value="${(p.name||'').replace(/"/g,'&quot;')}" placeholder="${T('pocket_name_ph')}">
         <input class="pk-amt" data-i="${i}" value="${p.amount?(p.amount/100).toFixed(2).replace('.',','):''}" placeholder="0,00">
-        <button class="pk-del" data-i="${i}" title="Usuń">×</button></div>`).join('')
-      : `<div class="tgt-txt" style="margin-bottom:8px">Brak podkont — dodaj pierwsze poniżej.</div>`;
+        <button class="pk-del" data-i="${i}" title="${T('delete')}">×</button></div>`).join('')
+      : `<div class="tgt-txt" style="margin-bottom:8px">${T('no_pockets')}</div>`;
     pkList.querySelectorAll('.pk-del').forEach(b=>b.onclick=()=>{syncPk();pk.splice(+b.dataset.i,1);renderPk();});
   };
   renderPk();
   $('#addPk').onclick=()=>{syncPk();pk.push({id:uid('p'),name:'',amount:0});renderPk();};
 
   $('#eSave').onclick=()=>{
-    const name=$('#eName').value.trim(); if(!name){toast('Podaj nazwę');return;}
+    const name=$('#eName').value.trim(); if(!name){toast(T('enter_name'));return;}
     const nt=typeSel.value;
     const rawNum=$('#eNumber').value.trim();
     let numToStore=rawNum;
@@ -1158,7 +1421,7 @@ function openEditAccount(id){
       const newPockets=pk.filter(p=>p.name.trim()).map(p=>{
         const pid=p.id||uid('p'); keptIds.add(pid);
         const delta=p.amount - pocketBalance(pid);     // reconcile to typed balance via an adjustment txn
-        if(delta) pushPocketTxn(a.id,pid,delta,nowInMonth(),'Korekta podkonta');
+        if(delta) pushPocketTxn(a.id,pid,delta,nowInMonth(),T('pocket_adjust'));
         return {id:pid,name:p.name.trim()};
       });
       (a.pockets||[]).filter(p=>!keptIds.has(p.id)).forEach(p=>{
@@ -1166,20 +1429,20 @@ function openEditAccount(id){
       });
       a.pockets=newPockets;
     }
-    closeModal(); toast('Zapisano zmiany'); render();
+    closeModal(); toast(T('changes_saved')); render();
   };
   $('#delAcct').onclick=()=>{
-    if(!confirm(`Usunąć konto „${a.name}"?`+(nTxn?`\nZostanie trwale usuniętych ${nTxn} transakcji.`:''))) return;
+    if(!confirm(T('del_acct_confirm', a.name, nTxn))) return;
     state.accounts=state.accounts.filter(x=>x.id!==a.id);
     state.transactions=state.transactions.filter(t=>t.accountId!==a.id);
     if(ui.selAcct===a.id) ui.selAcct='all';
-    closeModal(); toast('Konto usunięte'); render();
+    closeModal(); toast(T('account_deleted')); render();
   };
 }
 function openAddCategory(groupId){
-  openModal(`<div class="modal"><div class="modal-h"><h3>Nowa kategoria</h3><button class="x" data-close>×</button></div>
-    <div class="modal-b"><div class="field"><label>Nazwa kategorii</label><input id="catName" type="text" placeholder="np. Subskrypcje"></div></div>
-    <div class="modal-f"><button class="btn ghost" data-close>Anuluj</button><button class="btn" id="catSave">Dodaj</button></div></div>`);
+  openModal(`<div class="modal"><div class="modal-h"><h3>${T('new_category')}</h3><button class="x" data-close>×</button></div>
+    <div class="modal-b"><div class="field"><label>${T('category_name')}</label><input id="catName" type="text" placeholder="${T('category_ph')}"></div></div>
+    <div class="modal-f"><button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="catSave">${T('add')}</button></div></div>`);
   modalHost.querySelector('#catName').focus();
   modalHost.querySelector('#catSave').onclick=()=>{
     const name=modalHost.querySelector('#catName').value.trim(); if(!name){return;}
@@ -1188,9 +1451,9 @@ function openAddCategory(groupId){
   };
 }
 function openAddGroup(){
-  openModal(`<div class="modal"><div class="modal-h"><h3>Nowa grupa kategorii</h3><button class="x" data-close>×</button></div>
-    <div class="modal-b"><div class="field"><label>Nazwa grupy</label><input id="grName" type="text" placeholder="np. Dzieci"></div></div>
-    <div class="modal-f"><button class="btn ghost" data-close>Anuluj</button><button class="btn" id="grSave">Dodaj</button></div></div>`);
+  openModal(`<div class="modal"><div class="modal-h"><h3>${T('new_group')}</h3><button class="x" data-close>×</button></div>
+    <div class="modal-b"><div class="field"><label>${T('group_name')}</label><input id="grName" type="text" placeholder="${T('group_ph')}"></div></div>
+    <div class="modal-f"><button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="grSave">${T('add')}</button></div></div>`);
   modalHost.querySelector('#grName').focus();
   modalHost.querySelector('#grSave').onclick=()=>{
     const name=modalHost.querySelector('#grName').value.trim(); if(!name)return;
@@ -1213,7 +1476,12 @@ document.getElementById('prevM').onclick=()=>shiftMonth(-1);
 document.getElementById('nextM').onclick=()=>shiftMonth(1);
 document.getElementById('addTxnBtn').onclick=openAddTxn;
 document.getElementById('rtaPill').onclick=autoAssignTargets;
-document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{ui.view=b.dataset.view;render();});
+// mobile drawer (hamburger) + backdrop
+const sidebarEl=document.querySelector('.sidebar'), backdropEl=document.getElementById('sideBackdrop');
+function openSidebar(){ sidebarEl.classList.add('open'); backdropEl.classList.add('show'); }
+function closeSidebar(){ sidebarEl.classList.remove('open'); backdropEl.classList.remove('show'); }
+document.getElementById('menuBtn').onclick=openSidebar;
+backdropEl.onclick=closeSidebar;
 
 // Click RTA -> auto-fund all monthly targets to their needed amount (up to available)
 function autoAssignTargets(){
@@ -1226,7 +1494,7 @@ function autoAssignTargets(){
         const need=Math.min(c.target.amount-cur, rta); m[c.id]=cur+need; funded+=need; }
     }
   }
-  render(); toast(funded?('Przypisano '+fmt(funded)+' do celów'):'Wszystkie cele już sfinansowane');
+  render(); toast(funded?T('assigned_to_targets',fmt(funded)):T('all_targets_funded'));
 }
 
 /* =========================================================================
@@ -1244,13 +1512,13 @@ function hideAuth(){ authScreen.style.display='none'; }
 function setAuthMsg(m,isErr){ const el=document.getElementById('authMsg'); el.textContent=m||''; el.style.color=isErr?'var(--red)':''; }
 async function sendMagicLink(){
   const email=(document.getElementById('authEmail').value||'').trim();
-  if(!email){ setAuthMsg('Podaj adres e-mail.', true); return; }
-  const btn=document.getElementById('authBtn'); btn.disabled=true; setAuthMsg('Wysyłam link…');
+  if(!email){ setAuthMsg(T('auth_enter_email'), true); return; }
+  const btn=document.getElementById('authBtn'); btn.disabled=true; setAuthMsg(T('auth_sending'));
   const redirect=window.location.origin + window.location.pathname;
   const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: redirect } });
   btn.disabled=false;
-  if(error) setAuthMsg('Błąd: '+error.message, true);
-  else setAuthMsg('✓ Sprawdź skrzynkę — link do logowania wysłany na '+email+'.');
+  if(error) setAuthMsg(T('auth_error', error.message), true);
+  else setAuthMsg(T('auth_sent', email));
 }
 
 /* ---- cloud data ---- */
@@ -1278,7 +1546,7 @@ function subscribeRealtime(){
       if(!incoming || !incoming.accounts) return;
       if(state && state.meta && incoming.meta && incoming.meta.rev === state.meta.rev) return;   // our own change
       applyingRemote=true; state=hydrate(incoming); render(); applyingRemote=false;
-      toast('Zsynchronizowano z innym urządzeniem');
+      toast(T('synced_other'));
     })
     .subscribe();
 }
@@ -1287,16 +1555,16 @@ function subscribeRealtime(){
 function exportJSON(){
   const blob=new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='mybalance-backup.json';
-  a.click(); URL.revokeObjectURL(a.href); toast('Wyeksportowano kopię JSON');
+  a.click(); URL.revokeObjectURL(a.href); toast(T('exported'));
 }
 function importJSON(file){
   const r=new FileReader();
   r.onload=()=>{ try{
     const obj=JSON.parse(r.result);
-    if(!obj || !obj.accounts){ toast('Nieprawidłowy plik'); return; }
-    if(!confirm('Zaimportować dane z pliku? Zastąpią obecny budżet.')) return;
-    state=hydrate(obj); save(); render(); toast('Zaimportowano dane');
-  }catch(e){ toast('Nie udało się wczytać pliku'); } };
+    if(!obj || !obj.accounts){ toast(T('invalid_file')); return; }
+    if(!confirm(T('import_confirm'))) return;
+    state=hydrate(obj); save(); render(); toast(T('imported'));
+  }catch(e){ toast(T('import_fail')); } };
   r.readAsText(file);
 }
 
@@ -1304,13 +1572,18 @@ function importJSON(file){
 function renderSideFoot(){
   const el=document.getElementById('sideFoot'); if(!el) return;
   el.innerHTML=`
+    <div class="lang-tog">
+      <button data-lang="en" class="${LANG==='en'?'on':''}">EN</button>
+      <button data-lang="pl" class="${LANG==='pl'?'on':''}">PL</button>
+    </div>
     <div class="sf-user">${currentUser?currentUser.email:''}</div>
     <div class="sf-actions">
-      <button id="sfExport">Eksport</button>
-      <button id="sfImport">Import</button>
-      <button id="sfLogout">Wyloguj</button>
+      <button id="sfExport">${T('export')}</button>
+      <button id="sfImport">${T('import')}</button>
+      <button id="sfLogout">${T('logout')}</button>
     </div>
     <input type="file" id="sfFile" accept="application/json" style="display:none">`;
+  el.querySelectorAll('[data-lang]').forEach(b=>b.onclick=()=>setLang(b.dataset.lang));
   el.querySelector('#sfExport').onclick=exportJSON;
   el.querySelector('#sfImport').onclick=()=>el.querySelector('#sfFile').click();
   el.querySelector('#sfFile').onchange=e=>{ if(e.target.files[0]) importJSON(e.target.files[0]); e.target.value=''; };
@@ -1320,7 +1593,7 @@ function renderSideFoot(){
 /* ---- session lifecycle ---- */
 async function onLogin(user){
   if(currentUser) return;
-  currentUser=user; setAuthMsg('Ładuję dane…');
+  currentUser=user; setAuthMsg(T('auth_loading'));
   try{ state = await loadCloud(); }catch(e){ console.error(e); state = load(); }
   subscribeRealtime(); hideAuth(); render();
 }
@@ -1333,7 +1606,9 @@ function onLogout(){
 async function doLogout(){ if(sb) await sb.auth.signOut(); onLogout(); }
 
 async function bootstrap(){
-  if(!sb){ showAuth('Nie udało się połączyć z usługą synchronizacji. Odśwież stronę.'); return; }
+  setChrome(); applyRail();
+  const cb=document.getElementById('collapseBtn'); if(cb) cb.onclick=toggleRail;
+  if(!sb){ showAuth(T('auth_conn_fail')); return; }
   document.getElementById('authBtn').onclick=sendMagicLink;
   document.getElementById('authEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') sendMagicLink(); });
   const { data:{ session } } = await sb.auth.getSession();
