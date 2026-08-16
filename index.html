@@ -517,7 +517,8 @@ const I18N = {
     to_pocket:n=>`To: ${n}`, from_pocket:n=>`From: ${n}`, transfer_out_pocket:'Transfer from pocket', transfer_in_pocket:'Transfer to pocket',
     assigned_to_targets:x=>`Assigned ${x} to targets`, all_targets_funded:'All targets already funded',
     exported:'JSON backup exported', invalid_file:'Invalid file', import_confirm:'Import data from file? It will replace the current budget.',
-    imported:'Data imported', import_fail:'Could not read the file', synced_other:'Synced from another device'
+    imported:'Data imported', import_fail:'Could not read the file', synced_other:'Synced from another device',
+    sync_error:'Sync failed — check your connection'
   },
   pl:{
     tagline:'Budżet domowy · PLN', ready_to_assign:'Do<br>przypisania', rta_tip:'Kliknij, aby sfinansować cele miesięczne',
@@ -564,7 +565,8 @@ const I18N = {
     to_pocket:n=>`Do: ${n}`, from_pocket:n=>`Z: ${n}`, transfer_out_pocket:'Przelew z podkonta', transfer_in_pocket:'Przelew na podkonto',
     assigned_to_targets:x=>`Przypisano ${x} do celów`, all_targets_funded:'Wszystkie cele już sfinansowane',
     exported:'Wyeksportowano kopię JSON', invalid_file:'Nieprawidłowy plik', import_confirm:'Zaimportować dane z pliku? Zastąpią obecny budżet.',
-    imported:'Zaimportowano dane', import_fail:'Nie udało się wczytać pliku', synced_other:'Zsynchronizowano z innym urządzeniem'
+    imported:'Zaimportowano dane', import_fail:'Nie udało się wczytać pliku', synced_other:'Zsynchronizowano z innym urządzeniem',
+    sync_error:'Błąd synchronizacji — sprawdź połączenie'
   }
 };
 function T(k,...a){ let v=(I18N[LANG]&&I18N[LANG][k]); if(v==null) v=I18N.en[k]; if(v==null) return k; return typeof v==='function'?v(...a):v; }
@@ -1534,8 +1536,13 @@ async function pushCloud(){
   if(!sb || !currentUser || !state) return;
   state.meta = state.meta || {}; state.meta.rev = uid('rev');   // tag our revision so we can ignore the echo
   localStorage.setItem(STORE, JSON.stringify(state));
-  const { error } = await sb.from('budgets').upsert({ user_id: currentUser.id, data: state, updated_at: new Date().toISOString() });
-  if(error) console.error('Cloud save failed', error);
+  const payload=()=>({ user_id: currentUser.id, data: state, updated_at: new Date().toISOString() });
+  let { error } = await sb.from('budgets').upsert(payload());
+  if(error){                                   // token may have gone stale — refresh session and retry once
+    try{ await sb.auth.refreshSession(); }catch(e){}
+    ({ error } = await sb.from('budgets').upsert(payload()));
+  }
+  if(error){ console.error('Cloud save failed', error); toast('⚠ '+T('sync_error')); }
 }
 let rtChannel=null;
 function subscribeRealtime(){
@@ -1545,7 +1552,7 @@ function subscribeRealtime(){
       const incoming = payload.new && payload.new.data;
       if(!incoming || !incoming.accounts) return;
       if(state && state.meta && incoming.meta && incoming.meta.rev === state.meta.rev) return;   // our own change
-      applyingRemote=true; state=hydrate(incoming); render(); applyingRemote=false;
+      try{ applyingRemote=true; state=hydrate(incoming); render(); } finally { applyingRemote=false; }
       toast(T('synced_other'));
     })
     .subscribe();
