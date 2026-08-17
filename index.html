@@ -209,18 +209,25 @@
   .add-cat.lvl2{padding-left:22px;}
   .add-cat.lvl3{padding-left:44px;}
   /* categories manager */
-  .cm-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line);}
+  .cm-row{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--line);}
   .cm-row.lvl1{margin-top:10px;}
+  .cm-row.lvl2{padding-left:22px;}
+  .cm-row.lvl3{padding-left:44px;}
+  .cm-grip{cursor:grab;color:var(--ink-soft);opacity:.45;font-size:.9rem;flex:0 0 auto;user-select:none;padding:0 2px;}
+  .cm-grip:active{cursor:grabbing;}
   .cm-name{flex:1;border:1px solid transparent;border-radius:var(--r-sm);padding:7px 9px;outline:none;background:transparent;font-size:.92rem;min-width:0;}
   .cm-row.lvl1 .cm-name{font-weight:700;}
-  .cm-row.lvl2 .cm-name{margin-left:22px;}
-  .cm-row.lvl3 .cm-name{margin-left:44px;font-size:.88rem;color:var(--ink-soft);}
+  .cm-row.lvl3 .cm-name{font-size:.88rem;color:var(--ink-soft);}
   .cm-name:hover{border-color:var(--line);background:var(--surface);}
   .cm-name:focus{border-color:var(--accent);background:var(--surface);}
   .cm-actions{display:flex;gap:4px;flex:0 0 auto;}
   .cm-actions button{width:30px;height:30px;border-radius:var(--r-sm);color:var(--ink-soft);font-size:1rem;}
   .cm-add:hover{background:var(--surface-2);color:var(--brand);}
   .cm-del:hover{background:var(--red-bg);color:var(--red);}
+  .cm-row.dragging{opacity:.4;}
+  .cm-row.drop-before{box-shadow:inset 0 2px 0 var(--brand);}
+  .cm-row.drop-after{box-shadow:inset 0 -2px 0 var(--brand);}
+  .cm-row.drop-into{background:var(--surface-2);box-shadow:inset 0 0 0 2px var(--brand);}
   .table-foot{padding:12px 4px;display:flex;justify-content:center;}
 
   /* ============ INSPECTOR ============ */
@@ -1111,6 +1118,40 @@ function openAddSub(catId){
     closeModal(); render();
   };
 }
+let dragCat=null;
+// locate a node: which array holds it, its index and level
+function catLoc(id){
+  const g=state.groups;
+  for(let i=0;i<g.length;i++){ if(g[i].id===id) return {arr:g,idx:i,level:1};
+    const cats=g[i].categories||[];
+    for(let j=0;j<cats.length;j++){ if(cats[j].id===id) return {arr:cats,idx:j,level:2,parent:g[i]};
+      const subs=cats[j].subs||[];
+      for(let k=0;k<subs.length;k++){ if(subs[k].id===id) return {arr:subs,idx:k,level:3,parent:cats[j]}; }
+    }
+  }
+  return null;
+}
+// move a node. mode: 'before'|'after' (same-level reorder relative to target) or 'into' (append as child of a one-level-higher target)
+function moveCatNode(dragId,targetId,mode){
+  if(dragId===targetId) return;
+  const from=catLoc(dragId); if(!from) return;
+  const node=from.arr[from.idx];
+  let destArr, destIdx;
+  if(mode==='into'){
+    const tgt=catById(targetId); if(!tgt) return;
+    if(from.level===2) destArr=(tgt.categories=tgt.categories||[]);
+    else if(from.level===3) destArr=(tgt.subs=tgt.subs||[]);
+    else return;
+    destIdx=destArr.length;
+  } else {
+    const tl=catLoc(targetId); if(!tl || tl.level!==from.level) return;
+    destArr=tl.arr; destIdx=tl.idx + (mode==='after'?1:0);
+  }
+  from.arr.splice(from.idx,1);
+  if(from.arr===destArr && from.idx<destIdx) destIdx--;
+  destArr.splice(destIdx,0,node);
+  save(); render();
+}
 
 /* ---------- ACCOUNTS / TRANSACTIONS ---------- */
 function catCell(t){
@@ -1251,7 +1292,8 @@ function kontaView(){
 /* ---------- CATEGORIES MANAGER ---------- */
 function categoriesView(){
   const el=document.createElement('div'); el.style.maxWidth='760px'; el.style.margin='0 auto';
-  const rowHtml=(n,level)=>`<div class="cm-row lvl${level}">
+  const rowHtml=(n,level)=>`<div class="cm-row lvl${level}" data-id="${n.id}" data-level="${level}">
+      <span class="cm-grip" draggable="true">⠿</span>
       <input class="cm-name" data-id="${n.id}" value="${(n.name||'').replace(/"/g,'&quot;')}">
       <div class="cm-actions">
         ${level<3?`<button class="cm-add" data-add="${n.id}" data-level="${level}" title="${level===1?T('add_category'):T('add_subcategory')}">＋</button>`:''}
@@ -1273,6 +1315,25 @@ function categoriesView(){
   el.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{ (+b.dataset.level===1?openAddCategory:openAddSub)(b.dataset.add); });
   el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(confirm(T('del_node_confirm'))) deleteCategory(b.dataset.del); });
   el.querySelector('#addSecBtn').onclick=openAddGroup;
+  // drag & drop: grip starts the drag, the row is the drop target
+  const clearDrop=()=>el.querySelectorAll('.cm-row').forEach(r=>r.classList.remove('drop-before','drop-after','drop-into'));
+  el.querySelectorAll('.cm-row').forEach(row=>{
+    const grip=row.querySelector('.cm-grip');
+    grip.ondragstart=e=>{ dragCat={id:row.dataset.id, level:+row.dataset.level}; e.dataTransfer.effectAllowed='move'; row.classList.add('dragging'); };
+    grip.ondragend=()=>{ dragCat=null; el.querySelectorAll('.cm-row').forEach(r=>r.classList.remove('dragging')); clearDrop(); };
+    row.ondragover=e=>{
+      if(!dragCat) return;
+      const dl=dragCat.level, tl=+row.dataset.level; let mode=null;
+      if(row.dataset.id!==dragCat.id){
+        if(tl===dl){ const rc=row.getBoundingClientRect(); mode=(e.clientY<rc.top+rc.height/2)?'before':'after'; }
+        else if(tl===dl-1){ mode='into'; }
+      }
+      row._dropmode=mode; clearDrop();
+      if(mode){ e.preventDefault(); row.classList.add('drop-'+mode); }
+    };
+    row.ondragleave=()=>row.classList.remove('drop-before','drop-after','drop-into');
+    row.ondrop=e=>{ e.preventDefault(); const mode=row._dropmode; clearDrop(); if(mode && dragCat) moveCatNode(dragCat.id, row.dataset.id, mode); };
+  });
   return el;
 }
 function reportsView(){
