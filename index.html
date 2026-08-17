@@ -244,13 +244,17 @@
   .cm-count{flex:0 0 auto;font-size:.66rem;color:var(--ink-soft);background:var(--surface-2);padding:1px 8px;border-radius:var(--r-pill);}
   /* between-row hover insert (+) */
   .cm-ins{position:relative;height:10px;cursor:pointer;}
-  .cm-ins::after{content:"";position:absolute;right:0;top:50%;height:2px;background:transparent;border-radius:2px;transform:translateY(-50%);transition:.12s;}
+  /* line + button sit ON the row divider (strip's top edge), not centered in the gap */
+  .cm-ins::after{content:"";position:absolute;right:0;top:0;height:2px;background:transparent;border-radius:2px;transform:translateY(-50%);transition:.12s;}
   .cm-ins.addcat::after{left:22px;} .cm-ins.addsub::after{left:44px;}
   .cm-ins:hover::after{background:var(--brand);opacity:.45;}
-  .cm-ins-btn{position:absolute;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:50%;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);font-size:1rem;line-height:1;display:flex;align-items:center;justify-content:center;opacity:0;transition:.12s;z-index:1;}
+  .cm-ins-btn{position:absolute;top:0;transform:translateY(-50%);width:20px;height:20px;border-radius:50%;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);font-size:1rem;line-height:1;display:flex;align-items:center;justify-content:center;opacity:0;transition:.12s;z-index:2;}
   .cm-ins.addcat .cm-ins-btn{left:14px;} .cm-ins.addsub .cm-ins-btn{left:36px;}
   .cm-ins:hover .cm-ins-btn{opacity:1;}
   .cm-ins-btn:hover{background:var(--brand);color:#fff;border-color:var(--brand);}
+  /* manager action toolbar — sticky at top so it stays reachable in a long list */
+  .cm-toolbar{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+    background:var(--surface);padding:10px 0;margin-bottom:6px;border-bottom:1px solid var(--line);}
   /* searchable category combobox */
   .cat-combo{position:relative;}
   .cc-input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm);outline:none;font-size:.95rem;}
@@ -1551,13 +1555,13 @@ function categoriesView(){
     <div class="seg-toggle" style="margin-bottom:14px">
       <button class="${kind==='expense'?'on':''}" data-ckind="expense">${T('tab_spending')}</button>
       <button class="${kind==='income'?'on':''}" data-ckind="income">${T('tab_income')}</button></div>
-    <div class="tgt-txt" style="margin-bottom:14px">${T('cat_hint')}</div>
-    <div id="catTree">${tree||`<div class="tgt-txt">—</div>`}</div>
-    <div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap">
+    <div class="tgt-txt" style="margin-bottom:10px">${T('cat_hint')}</div>
+    <div class="cm-toolbar">
       <button class="btn ghost" id="addSecBtn">${T('add_section')}</button>
       <button class="btn ghost" id="expandAllBtn" style="opacity:.75">${allExpanded(root)?T('collapse_all'):T('expand_all')}</button>
       <button class="btn ghost" id="seedSnapBtn" title="Temporary dev tool" style="margin-left:auto;opacity:.75">⚙ Save as seed</button>
-    </div></div>`;
+    </div>
+    <div id="catTree">${tree||`<div class="tgt-txt">—</div>`}</div></div>`;
   el.querySelectorAll('[data-ckind]').forEach(b=>b.onclick=()=>{ ui.catKind=b.dataset.ckind; render(); });
   el.querySelector('#seedSnapBtn').onclick=openSeedExport;
   el.querySelector('#expandAllBtn').onclick=()=>{ toggleExpandAll(root); render(); };
