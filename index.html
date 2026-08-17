@@ -974,15 +974,15 @@ function budgetView(){
   t.innerHTML=`<div class="brow-h"><div>${T('col_category')}</div><div class="num">${T('col_assigned')}</div><div class="num c-act">${T('col_activity')}</div><div class="num">${T('col_available')}</div></div>`;
   const m=ui.month;
   const rowHtml=(node,level)=>{
-    const a=assigned(node.id,m), act=activity(node.id,m), avl=available(node.id,m);
     const kids=nodeKids(node), hasKids=kids.length>0, coll=!!ui.collapsed[node.id];
+    // parent rows show the rolled-up total (own + everything beneath); leaves show their own (rolled === own)
+    const a=rolled(node,m,assigned), act=rolled(node,m,activity), avl=rolled(node,m,available);
     const ti=targetInfo(node,m);
     let cls='zero'; if(avl<0)cls='neg'; else if(ti.state==='under'&&avl>=0)cls='under'; else if(avl>0)cls='pos';
     const bar = ti.state!=='none' ? `<div class="tgt-bar ${ti.state==='under'?'under':''}"><i style="width:${ti.pct}%"></i></div>` : '';
-    const branch = hasKids ? `<span class="branch-sum">${T('branch')}: ${fmt(rolled(node,m,assigned))} · ${fmt(rolled(node,m,available))}</span>` : '';
     const caret = hasKids ? `<span class="caret ${coll?'c':''}" data-caret="${node.id}">▼</span>` : `<span class="caret-sp"></span>`;
     return `<div class="cat-row lvl${level} ${hasKids?'is-parent':''} ${ui.selCat===node.id?'sel':''}" data-cat="${node.id}">
-      <div class="cat-name"><div class="nm">${caret}<span class="nm-txt">${node.name}</span>${branch}</div>${bar}</div>
+      <div class="cat-name"><div class="nm">${caret}<span class="nm-txt">${node.name}</span></div>${bar}</div>
       <div class="assigned-cell"><span class="val" data-assign="${node.id}">${fmt(a)}</span></div>
       <div class="num activity-cell">${act?fmt(act):'—'}</div>
       <div class="num"><span class="avail-pill ${cls}">${fmt(avl)}</span></div>
@@ -1021,13 +1021,18 @@ function budgetView(){
 }
 
 function editAssign(el){
-  const catId=el.dataset.assign, cur=assigned(catId,ui.month);
-  const inp=document.createElement('input'); inp.type='text'; inp.value=(cur/100).toFixed(2).replace('.',',');
+  const catId=el.dataset.assign, m=ui.month;
+  const node=catById(catId), kids=node?nodeKids(node):[];
+  const childSum = kids.reduce((s,k)=>s+rolled(k,m,assigned),0);   // total assigned beneath this node
+  const shown = childSum + assigned(catId,m);                      // what the row displays (rolled total)
+  const inp=document.createElement('input'); inp.type='text'; inp.value=(shown/100).toFixed(2).replace('.',',');
   el.replaceWith(inp); inp.focus(); inp.select();
   const commit=()=>{
-    const v=parseAmt(inp.value);
-    if(!state.assignments[ui.month]) state.assignments[ui.month]={};
-    state.assignments[ui.month][catId]=v; render();
+    let v=parseAmt(inp.value);
+    if(v<childSum) v=childSum;                     // a parent can't be set below the sum of its children
+    if(!state.assignments[m]) state.assignments[m]={};
+    state.assignments[m][catId] = v - childSum;    // store this node's OWN share; the rest comes from children
+    render();
   };
   inp.onkeydown=e=>{if(e.key==='Enter')commit(); if(e.key==='Escape')render();};
   inp.onblur=commit;
@@ -1042,7 +1047,7 @@ function inspectorView(){
   }
   const c=catById(ui.selCat); if(!c){ui.selCat=null;return inspectorView();}
   el.classList.add('sheet-open');
-  const avl=available(c.id,ui.month), ti=targetInfo(c,ui.month);
+  const avl=rolled(c,ui.month,available), ti=targetInfo(c,ui.month);
   const cls=avl<0?'red':avl>0?'green':'';
   const otherCats=allCats().filter(x=>x.id!==c.id);
   el.innerHTML=`
