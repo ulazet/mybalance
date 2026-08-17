@@ -226,11 +226,12 @@
   .cm-del:hover{background:var(--red-bg);color:var(--red);}
   .cm-del:disabled{opacity:.28;cursor:not-allowed;}
   .cm-del:disabled:hover{background:none;color:var(--ink-soft);}
-  .cm-arch{color:var(--green);font-size:.7rem;}
-  .cm-arch:hover{background:var(--surface-2);}
+  .cm-actions .cm-toggle{width:34px;height:20px;border-radius:999px;background:var(--line);position:relative;padding:0;flex:0 0 auto;transition:.15s;}
+  .cm-actions .cm-toggle.on{background:var(--brand);}
+  .cm-toggle .knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:var(--sh-1);transition:.15s;}
+  .cm-toggle.on .knob{left:16px;}
   .cm-tag{font-size:.64rem;color:var(--ink-soft);background:var(--surface-2);padding:2px 7px;border-radius:var(--r-pill);flex:0 0 auto;}
   .cm-row.archived .cm-name{color:var(--ink-soft);text-decoration:line-through;opacity:.75;}
-  .cm-row.archived .cm-arch{color:var(--ink-soft);}
   .cm-row.dragging{opacity:.4;}
   .cm-row.drop-before{box-shadow:inset 0 2px 0 var(--brand);}
   .cm-row.drop-after{box-shadow:inset 0 -2px 0 var(--brand);}
@@ -584,7 +585,8 @@ const I18N = {
     del_node_confirm:'Delete this and everything inside it? Its transactions will become uncategorized.',
     branch:'branch', uncategorized:'Uncategorized', cat_hint:'Add, rename, delete and nest categories (3 levels). Assign budget on any level.',
     search_category:'Search category…', no_match:'No matches', pick_category:'Pick a category',
-    enable:'Enable', disable:'Disable', disabled_label:'disabled', cant_delete_txn:"Can't delete — it has transactions. Disable it instead."
+    enable:'Enable', disable:'Disable', disabled_label:'disabled',
+    cant_delete_txn:(n,d)=>`Can't delete — ${n} transaction${n===1?'':'s'} logged here${d?` (last on ${d})`:''}. Disable it instead.`
   },
   pl:{
     tagline:'Budżet domowy · PLN', ready_to_assign:'Do<br>przypisania', rta_tip:'Kliknij, aby sfinansować cele miesięczne',
@@ -639,7 +641,8 @@ const I18N = {
     del_node_confirm:'Usunąć to i całą zawartość? Powiązane transakcje stracą kategorię.',
     branch:'gałąź', uncategorized:'Bez kategorii', cat_hint:'Dodawaj, zmieniaj i usuwaj kategorie (3 poziomy). Przypisuj budżet na dowolnym poziomie.',
     search_category:'Szukaj kategorii…', no_match:'Brak wyników', pick_category:'Wybierz kategorię',
-    enable:'Włącz', disable:'Wyłącz', disabled_label:'wyłączona', cant_delete_txn:'Nie można usunąć — ma transakcje. Zamiast tego wyłącz.'
+    enable:'Włącz', disable:'Wyłącz', disabled_label:'wyłączona',
+    cant_delete_txn:(n,d)=>`Nie można usunąć — zapisano tu ${n} transakcj${n===1?'ę':'i'}${d?` (ostatnia ${d})`:''}. Zamiast tego wyłącz.`
   }
 };
 function T(k,...a){ let v=(I18N[LANG]&&I18N[LANG][k]); if(v==null) v=I18N.en[k]; if(v==null) return k; return typeof v==='function'?v(...a):v; }
@@ -1142,16 +1145,19 @@ function moveMoney(catId, otherId, amt, dir){
   if(dir==='to'){ add(catId,amt); add(otherId,-amt); }
   else { add(catId,-amt); add(otherId,amt); }
 }
-// does this node (or any descendant) have any transaction filed against it?
-function catHasTxns(nodeId){
-  const node=catById(nodeId); if(!node) return false;
+// how many transactions are filed against this node (or any descendant), and the latest date
+function catTxnInfo(nodeId){
+  const node=catById(nodeId); if(!node) return {count:0,lastDate:null};
   const ids=new Set(); const collect=n=>{ ids.add(n.id); nodeKids(n).forEach(collect); }; collect(node);
-  return state.transactions.some(t=>ids.has(t.categoryId));
+  const txns=state.transactions.filter(t=>ids.has(t.categoryId));
+  let lastDate=''; txns.forEach(t=>{ if(t.date>lastDate) lastDate=t.date; });
+  return {count:txns.length, lastDate:lastDate||null};
 }
 function toggleArchive(nodeId){ const n=catById(nodeId); if(n){ n.archived=!n.archived; if(n.archived&&ui.selCat===nodeId) ui.selCat=null; save(); render(); } }
 // hard-delete any node — only allowed when it (and its whole branch) has zero transactions
 function deleteCategory(nodeId){
-  if(catHasTxns(nodeId)){ toast(T('cant_delete_txn')); return; }
+  const info=catTxnInfo(nodeId);
+  if(info.count>0){ toast(T('cant_delete_txn', info.count, info.lastDate)); return; }
   const node=catById(nodeId); if(!node) return;
   const ids=new Set(); const collect=n=>{ ids.add(n.id); nodeKids(n).forEach(collect); }; collect(node);
   state.groups=state.groups.filter(sec=>{
@@ -1355,15 +1361,15 @@ function kontaView(){
 function categoriesView(){
   const el=document.createElement('div'); el.style.maxWidth='760px'; el.style.margin='0 auto';
   const rowHtml=(n,level)=>{
-    const hasTx=catHasTxns(n.id);
+    const info=catTxnInfo(n.id), hasTx=info.count>0;
     return `<div class="cm-row lvl${level} ${n.archived?'archived':''}" data-id="${n.id}" data-level="${level}">
       <span class="cm-grip" draggable="true">⠿</span>
       <input class="cm-name" data-id="${n.id}" value="${(n.name||'').replace(/"/g,'&quot;')}">
       ${n.archived?`<span class="cm-tag">${T('disabled_label')}</span>`:''}
       <div class="cm-actions">
-        <button class="cm-arch" data-arch="${n.id}" title="${n.archived?T('enable'):T('disable')}">${n.archived?'○':'●'}</button>
+        <button class="cm-toggle ${n.archived?'':'on'}" data-arch="${n.id}" role="switch" aria-checked="${!n.archived}" title="${n.archived?T('enable'):T('disable')}"><span class="knob"></span></button>
         ${level<3?`<button class="cm-add" data-add="${n.id}" data-level="${level}" title="${level===1?T('add_category'):T('add_subcategory')}">＋</button>`:''}
-        <button class="cm-del" data-del="${n.id}" ${hasTx?'disabled':''} title="${hasTx?T('cant_delete_txn'):T('delete')}">✕</button>
+        <button class="cm-del" data-del="${n.id}" ${hasTx?'disabled':''} title="${hasTx?T('cant_delete_txn',info.count,info.lastDate):T('delete')}">✕</button>
       </div></div>`;
   };
   let tree='';
