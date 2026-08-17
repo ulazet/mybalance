@@ -209,15 +209,15 @@
   .add-cat.lvl2{padding-left:22px;}
   .add-cat.lvl3{padding-left:44px;}
   /* categories manager */
-  .cm-row{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--line);}
-  .cm-row.lvl1{margin-top:10px;}
-  .cm-row.lvl2{padding-left:22px;}
-  .cm-row.lvl3{padding-left:44px;}
-  .cm-grip{cursor:grab;color:var(--ink-soft);opacity:.45;font-size:.9rem;flex:0 0 auto;user-select:none;padding:0 2px;}
+  /* icons (grip/caret) stay left-aligned across all levels; hierarchy comes from name font + a small name indent */
+  .cm-row{display:flex;align-items:center;gap:4px;padding:4px 0;border-bottom:1px solid var(--line);}
+  .cm-row.lvl1{margin-top:8px;}
+  .cm-grip{cursor:grab;color:var(--ink-soft);opacity:.4;font-size:.72rem;flex:0 0 auto;user-select:none;padding:0 1px;}
   .cm-grip:active{cursor:grabbing;}
-  .cm-name{flex:1;border:1px solid transparent;border-radius:var(--r-sm);padding:7px 9px;outline:none;background:transparent;font-size:.92rem;min-width:0;}
+  .cm-name{flex:1;border:1px solid transparent;border-radius:var(--r-sm);padding:6px 8px;outline:none;background:transparent;font-size:.9rem;min-width:0;}
   .cm-row.lvl1 .cm-name{font-weight:700;}
-  .cm-row.lvl3 .cm-name{font-size:.88rem;color:var(--ink-soft);}
+  .cm-row.lvl2 .cm-name{font-weight:600;margin-left:12px;}
+  .cm-row.lvl3 .cm-name{font-size:.84rem;color:var(--ink-soft);margin-left:24px;}
   .cm-name:hover{border-color:var(--line);background:var(--surface);}
   .cm-name:focus{border-color:var(--accent);background:var(--surface);}
   .cm-actions{display:flex;gap:4px;flex:0 0 auto;}
@@ -238,18 +238,18 @@
   .cm-row.drop-after{box-shadow:inset 0 -2px 0 var(--brand);}
   .cm-row.drop-into{background:var(--surface-2);box-shadow:inset 0 0 0 2px var(--brand);}
   /* collapse carets + child count */
-  .cm-caret{flex:0 0 auto;width:16px;text-align:center;cursor:pointer;color:var(--ink-soft);font-size:.72rem;transition:transform .15s;user-select:none;}
+  .cm-caret{flex:0 0 auto;width:12px;text-align:center;cursor:pointer;color:var(--ink-soft);font-size:.58rem;transition:transform .15s;user-select:none;}
   .cm-caret.open{transform:rotate(90deg);}
-  .cm-caret-sp{flex:0 0 auto;width:16px;}
+  .cm-caret-sp{flex:0 0 auto;width:12px;}
   .cm-count{flex:0 0 auto;font-size:.66rem;color:var(--ink-soft);background:var(--surface-2);padding:1px 8px;border-radius:var(--r-pill);}
   /* between-row hover insert (+) */
   .cm-ins{position:relative;height:10px;cursor:pointer;}
   /* line + button sit ON the row divider (strip's top edge), not centered in the gap */
   .cm-ins::after{content:"";position:absolute;right:0;top:0;height:2px;background:transparent;border-radius:2px;transform:translateY(-50%);transition:.12s;}
-  .cm-ins.addcat::after{left:22px;} .cm-ins.addsub::after{left:44px;}
+  .cm-ins.addsec::after{left:0;} .cm-ins.addcat::after{left:32px;} .cm-ins.addsub::after{left:44px;}
   .cm-ins:hover::after{background:var(--brand);opacity:.45;}
-  .cm-ins-btn{position:absolute;top:0;transform:translateY(-50%);width:20px;height:20px;border-radius:50%;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);font-size:1rem;line-height:1;display:flex;align-items:center;justify-content:center;opacity:0;transition:.12s;z-index:2;}
-  .cm-ins.addcat .cm-ins-btn{left:14px;} .cm-ins.addsub .cm-ins-btn{left:36px;}
+  .cm-ins-btn{position:absolute;top:0;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);font-size:.95rem;line-height:1;display:flex;align-items:center;justify-content:center;opacity:0;transition:.12s;z-index:2;}
+  .cm-ins.addsec .cm-ins-btn{left:-2px;} .cm-ins.addcat .cm-ins-btn{left:24px;} .cm-ins.addsub .cm-ins-btn{left:36px;}
   .cm-ins:hover .cm-ins-btn{opacity:1;}
   .cm-ins-btn:hover{background:var(--brand);color:#fff;border-color:var(--brand);}
   /* manager action toolbar — sticky at top so it stays reachable in a long list */
@@ -1532,10 +1532,12 @@ function categoriesView(){
       </div></div>`;
   };
   const insHtml=(pid,level,index)=>`<div class="cm-ins ${level===1?'addcat':'addsub'}" data-add="${pid}" data-level="${level}" data-index="${index}"><button class="cm-ins-btn" title="${level===1?T('add_category'):T('add_subcategory')}">+</button></div>`;
+  const insSec=index=>`<div class="cm-ins addsec" data-level="0" data-index="${index}"><button class="cm-ins-btn" title="${T('add_section')}">+</button></div>`;
   const kind=ui.catKind==='income'?'income':'expense';
   const root=rootForKind(kind);
   let tree='';
-  root.forEach(sec=>{
+  tree+=insSec(0);                                  // add a section above the first
+  root.forEach((sec,si)=>{
     tree+=rowHtml(sec,1);
     if(exp[sec.id]){
       const cats=sec.categories||[];
@@ -1545,11 +1547,12 @@ function categoriesView(){
         if(exp[cat.id]){
           const subs=cat.subs||[];
           tree+=insHtml(cat.id,2,0);
-          subs.forEach((sub,si)=>{ tree+=rowHtml(sub,3); tree+=insHtml(cat.id,2,si+1); });
+          subs.forEach((sub,si2)=>{ tree+=rowHtml(sub,3); tree+=insHtml(cat.id,2,si2+1); });
         }
         tree+=insHtml(sec.id,1,ci+1);
       });
     }
+    tree+=insSec(si+1);                             // add a section after this one
   });
   el.innerHTML=`<div class="rep-panel"><h3>${T('cat_manager')}</h3>
     <div class="seg-toggle" style="margin-bottom:14px">
@@ -1566,7 +1569,9 @@ function categoriesView(){
   el.querySelector('#seedSnapBtn').onclick=openSeedExport;
   el.querySelector('#expandAllBtn').onclick=()=>{ toggleExpandAll(root); render(); };
   el.querySelectorAll('[data-caret]').forEach(c=>c.onclick=()=>{ ui.catExpanded[c.dataset.caret]=!ui.catExpanded[c.dataset.caret]; render(); });
-  el.querySelectorAll('.cm-ins-btn').forEach(b=>b.onclick=()=>{ const s=b.closest('.cm-ins'); const pid=s.dataset.add, lvl=+s.dataset.level, idx=+s.dataset.index; ui.catExpanded[pid]=true; (lvl===1?openAddCategory:openAddSub)(pid, idx); });
+  el.querySelectorAll('.cm-ins-btn').forEach(b=>b.onclick=()=>{ const s=b.closest('.cm-ins'); const lvl=+s.dataset.level, idx=+s.dataset.index;
+    if(lvl===0){ openAddGroup(kind, idx); return; }                     // inline add a section
+    const pid=s.dataset.add; ui.catExpanded[pid]=true; (lvl===1?openAddCategory:openAddSub)(pid, idx); });
   el.querySelectorAll('.cm-name').forEach(inp=>inp.onchange=()=>{ const n=catById(inp.dataset.id); if(n){ const v=inp.value.trim(); if(v){ n.name=v; save(); } else inp.value=n.name; } });
   el.querySelectorAll('[data-arch]').forEach(b=>b.onclick=()=>toggleArchive(b.dataset.arch));
   el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(b.disabled) return; if(confirm(T('del_node_confirm'))) deleteCategory(b.dataset.del); });
@@ -1961,14 +1966,16 @@ function openAddCategory(groupId, index){
     closeModal(); render();
   };
 }
-function openAddGroup(kind){
+function openAddGroup(kind, index){
   openModal(`<div class="modal"><div class="modal-h"><h3>${T('new_group')}</h3><button class="x" data-close>×</button></div>
     <div class="modal-b"><div class="field"><label>${T('group_name')}</label><input id="grName" type="text" placeholder="${T('group_ph')}"></div></div>
     <div class="modal-f"><button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="grSave">${T('add')}</button></div></div>`);
   modalHost.querySelector('#grName').focus();
   modalHost.querySelector('#grSave').onclick=()=>{
     const name=modalHost.querySelector('#grName').value.trim(); if(!name)return;
-    rootForKind(kind).push({id:uid('g'),name,categories:[]}); closeModal(); render();
+    const arr=rootForKind(kind); const node={id:uid('g'),name,categories:[]};
+    (index==null||index<0||index>arr.length) ? arr.push(node) : arr.splice(index,0,node);
+    closeModal(); render();
   };
 }
 
