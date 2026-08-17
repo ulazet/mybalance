@@ -343,6 +343,11 @@
   .seg{display:flex;background:var(--surface-2);border-radius:var(--r-sm);padding:3px;margin-bottom:14px;}
   .seg button{flex:1;padding:8px;border-radius:var(--r-sm);font-weight:600;font-size:.86rem;color:var(--ink-soft);}
   .seg button.on{background:var(--surface);color:var(--ink);box-shadow:var(--sh-1);}
+  /* smaller segmented toggle for Spending|Income switches */
+  .seg-toggle{display:inline-flex;background:var(--surface-2);border-radius:var(--r-sm);padding:3px;gap:2px;}
+  .seg-toggle button{padding:6px 16px;border-radius:var(--r-sm);font-weight:600;font-size:.82rem;color:var(--ink-soft);cursor:pointer;}
+  .seg-toggle button.on{background:var(--surface);color:var(--ink);box-shadow:var(--sh-1);}
+  .budget-wrap>.seg-toggle{margin-bottom:12px;}
 
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;
     padding:11px 20px;border-radius:var(--r-md);font-size:.88rem;font-weight:600;box-shadow:var(--sh-2);opacity:0;
@@ -587,7 +592,8 @@ const I18N = {
     branch:'branch', uncategorized:'Uncategorized', cat_hint:'Add, rename, delete and nest categories (3 levels). Assign budget on any level.',
     search_category:'Search category…', no_match:'No matches', pick_category:'Pick a category',
     enable:'Enable', disable:'Disable', disabled_label:'disabled',
-    cant_delete_txn:(n,d)=>`Can't delete — ${n} transaction${n===1?'':'s'} logged here${d?` (last on ${d})`:''}. Disable it instead.`
+    cant_delete_txn:(n,d)=>`Can't delete — ${n} transaction${n===1?'':'s'} logged here${d?` (last on ${d})`:''}. Disable it instead.`,
+    tab_spending:'Spending', tab_income:'Income', col_expected:'Expected', col_actual:'Actual', col_difference:'Difference', income_by_source:'Income by source'
   },
   pl:{
     tagline:'Budżet domowy · PLN', ready_to_assign:'Do<br>przypisania', rta_tip:'Kliknij, aby sfinansować cele miesięczne',
@@ -643,7 +649,8 @@ const I18N = {
     branch:'gałąź', uncategorized:'Bez kategorii', cat_hint:'Dodawaj, zmieniaj i usuwaj kategorie (3 poziomy). Przypisuj budżet na dowolnym poziomie.',
     search_category:'Szukaj kategorii…', no_match:'Brak wyników', pick_category:'Wybierz kategorię',
     enable:'Włącz', disable:'Wyłącz', disabled_label:'wyłączona',
-    cant_delete_txn:(n,d)=>`Nie można usunąć — zapisano tu ${n} transakcj${n===1?'ę':'i'}${d?` (ostatnia ${d})`:''}. Zamiast tego wyłącz.`
+    cant_delete_txn:(n,d)=>`Nie można usunąć — zapisano tu ${n} transakcj${n===1?'ę':'i'}${d?` (ostatnia ${d})`:''}. Zamiast tego wyłącz.`,
+    tab_spending:'Wydatki', tab_income:'Przychody', col_expected:'Oczekiwane', col_actual:'Rzeczywiste', col_difference:'Różnica', income_by_source:'Przychody wg źródła'
   }
 };
 function T(k,...a){ let v=(I18N[LANG]&&I18N[LANG][k]); if(v==null) v=I18N.en[k]; if(v==null) return k; return typeof v==='function'?v(...a):v; }
@@ -663,7 +670,7 @@ function nowInMonth(){
 const parseAmt = s => { if(s==null) return 0; s=(''+s).replace(/\s/g,'').replace('zł','').replace(',','.'); const n=parseFloat(s); return isNaN(n)?0:Math.round(n*100); };
 
 const STORE = 'ynab_pl_budget_v1';
-let state, ui = { view:'dashboard', month:'2026-08', selCat:null, selAcct:'all', collapsed:{} };
+let state, ui = { view:'dashboard', month:'2026-08', selCat:null, selAcct:'all', collapsed:{}, budgetKind:'spending', catKind:'expense' };
 let dragAcctId=null;
 let seqCounter=0;
 const nextSeq=()=>++seqCounter;
@@ -725,6 +732,12 @@ function seed(){
     ]),
   ];
   const byName = n => { for(const g of groups) for(const c of g.categories) if(c.name===n) return c.id; };
+  // income category tree (separate root)
+  const incomeGroups = [
+    G('Regular income',[{n:'Salary',t:t('monthly',9800)},{n:'Bonus',t:null}]),
+    G('Other income',[{n:'Freelance',t:null},{n:'Gifts',t:null}]),
+  ];
+  const salaryId = incomeGroups[0].categories[0].id;
   const [chk,sav,cash,cc] = accts;
   const T=(date,acct,payee,cat,amt,cleared=true,starting=false)=>({id:uid('t'),date,accountId:acct.id,payee,categoryId:cat,amount:amt,memo:'',cleared,starting});
   const RTA='__rta__';
@@ -735,7 +748,7 @@ function seed(){
     T('2026-08-01',cash,'Saldo początkowe',RTA, 400*100,true,true),
     T('2026-08-01',cc,'Saldo początkowe',null, -1200*100,true,true),
     // income
-    T('2026-08-10',chk,'Wynagrodzenie',RTA, 9800*100),
+    T('2026-08-10',chk,'Wynagrodzenie',salaryId, 9800*100),
     // spending
     T('2026-08-02',chk,'Wspólnota — czynsz',byName('Czynsz / Kredyt'), -2200*100),
     T('2026-08-03',chk,'Tauron',byName('Prąd'), -175*100),
@@ -759,6 +772,8 @@ function seed(){
     'Poduszka finansowa':800,'Emerytura (IKE)':500,
   };
   for(const [n,v] of Object.entries(assign)) asg['2026-08'][byName(n)] = v*100;
+  // Expected income for current month (per income node)
+  const exp = {'2026-08':{[salaryId]:9800*100}};
 
   // materialise seeded pocket balances as internal (pocket) transactions
   accts.forEach(a=>a.pockets.forEach(p=>{ if(p._seed){
@@ -766,7 +781,7 @@ function seed(){
     delete p._seed;
   }}));
 
-  return { currency:'PLN', accounts:accts, groups, transactions:txns, assignments:asg,
+  return { currency:'PLN', accounts:accts, groups, incomeGroups, transactions:txns, assignments:asg, expected:exp,
            meta:{rtaKey:RTA, created:'2026-08-15'} };
 }
 
@@ -779,6 +794,8 @@ function normalize(s){
       (s.payees[t.categoryId]=s.payees[t.categoryId]||[]);
       if(!s.payees[t.categoryId].includes(t.payee)) s.payees[t.categoryId].push(t.payee); });
   }
+  if(!Array.isArray(s.incomeGroups)) s.incomeGroups=[];
+  if(!s.expected || typeof s.expected!=='object') s.expected={};
   return s;
 }
 // remembered payees per category
@@ -847,15 +864,25 @@ function deleteTransaction(id){
 }
 /* ---- category tree: 3 levels (section > category > subcategory); every node is budgetable ---- */
 function nodeKids(n){ return n.categories || n.subs || []; }            // section→categories, category→subs, sub→none
-function eachNode(cb){
-  (state.groups||[]).forEach(sec=>{ cb(sec,'',1,null,false); const sa=!!sec.archived;
+// income category tree (separate root)
+function incomeRoot(){ return state.incomeGroups || (state.incomeGroups=[]); }
+function rootForKind(kind){ return kind==='income' ? incomeRoot() : (state.groups||[]); }
+// walk one tree root
+function eachNodeIn(root, cb){
+  (root||[]).forEach(sec=>{ cb(sec,'',1,null,false); const sa=!!sec.archived;
     (sec.categories||[]).forEach(cat=>{ cb(cat,sec.name,2,sec,sa); const ca=sa||!!cat.archived;
       (cat.subs||[]).forEach(sub=>cb(sub,sec.name+' › '+cat.name,3,cat,ca));
     });
   });
 }
-// pickers exclude archived nodes (and anything under an archived parent)
-function allCats(){ const o=[]; eachNode((n,pp,level,parent,arch)=>{ if(!n.archived&&!arch) o.push({id:n.id,name:n.name,path:pp?pp+' › '+n.name:n.name,level,target:n.target,node:n}); }); return o; }
+// walk both trees (expenses first, then income)
+function eachNode(cb){ eachNodeIn(state.groups, cb); eachNodeIn(incomeRoot(), cb); }
+// set of every id in the income tree (for classifying transactions/reports)
+function incomeIdSet(){ const s=new Set(); eachNodeIn(incomeRoot(), n=>s.add(n.id)); return s; }
+function isIncomeCat(id){ return incomeIdSet().has(id); }
+// pickers exclude archived nodes (and anything under an archived parent). Pass a root to scope to one tree.
+function allCats(root){ const o=[]; const walk=root!==undefined?(cb=>eachNodeIn(root,cb)):eachNode;
+  walk((n,pp,level,parent,arch)=>{ if(!n.archived&&!arch) o.push({id:n.id,name:n.name,path:pp?pp+' › '+n.name:n.name,level,target:n.target,node:n}); }); return o; }
 function catById(id){ let f=null; eachNode(n=>{ if(n.id===id) f=n; }); return f; }     // finds archived too (for display)
 function nodePathById(id){ let p=''; eachNode((n,pp)=>{ if(n.id===id) p=pp?pp+' › '+n.name:n.name; }); return p; }
 function rolled(n,m,fn){ let s=fn(n.id,m); nodeKids(n).forEach(k=>{ if(!k.archived) s+=rolled(k,m,fn); }); return s; }   // own + active descendants
@@ -865,6 +892,8 @@ function activity(catId, mKey){
   return state.transactions.filter(t=>t.categoryId===catId && txnMonth(t)===mKey).reduce((s,t)=>s+t.amount,0);
 }
 function assigned(catId, mKey){ return (state.assignments[mKey]||{})[catId]||0; }
+// expected income for an income node within a month
+function expected(catId, mKey){ return (state.expected&&state.expected[mKey]||{})[catId]||0; }
 
 // cumulative available through selected month (rolls forward, incl. negatives)
 function monthsUpTo(mKey){
@@ -880,7 +909,8 @@ function available(catId, mKey){
 }
 // Ready to Assign = all inflows to RTA − all money assigned (all months)
 function readyToAssign(){
-  const inflow = state.transactions.filter(t=>t.categoryId===RTA()).reduce((s,t)=>s+t.amount,0);
+  const inc = incomeIdSet();
+  const inflow = state.transactions.filter(t=>t.categoryId===RTA()||inc.has(t.categoryId)).reduce((s,t)=>s+t.amount,0);
   let assignedTotal=0;
   for(const m of Object.values(state.assignments)) for(const v of Object.values(m)) assignedTotal+=v;
   return inflow - assignedTotal;
@@ -958,10 +988,11 @@ function render(){
   document.getElementById('mLabel').textContent = keyToLabel(ui.month);
   renderRTA();
   const c=document.getElementById('content');
-  const twoPane = ui.view==='budget'||ui.view==='accounts';
+  const budgetIncome = ui.view==='budget' && ui.budgetKind==='income';
+  const twoPane = (ui.view==='budget'&&!budgetIncome)||ui.view==='accounts';
   c.className = twoPane ? 'content' : 'content solo';
   c.innerHTML='';
-  if(ui.view==='budget') c.append(budgetView(), inspectorView());
+  if(ui.view==='budget') budgetIncome ? c.append(budgetView()) : c.append(budgetView(), inspectorView());
   else if(ui.view==='accounts') c.append(accountsView(), accountDetailsPanel());
   else if(ui.view==='dashboard') c.append(dashboardView());
   else if(ui.view==='konta') c.append(kontaView());
@@ -1006,6 +1037,13 @@ function acctColor(t){return {checking:'#2f7de1',savings:'#0a7d6e',cash:'#1f9d57
 /* ---------- BUDGET VIEW (3-level tree, budget on any level) ---------- */
 function budgetView(){
   const wrap=document.createElement('div'); wrap.className='budget-wrap';
+  const kind=ui.budgetKind==='income'?'income':'spending';
+  const seg=document.createElement('div'); seg.className='seg-toggle';
+  seg.innerHTML=`<button class="${kind==='spending'?'on':''}" data-bkind="spending">${T('tab_spending')}</button>`+
+                `<button class="${kind==='income'?'on':''}" data-bkind="income">${T('tab_income')}</button>`;
+  wrap.append(seg);
+  seg.querySelectorAll('[data-bkind]').forEach(b=>b.onclick=()=>{ ui.budgetKind=b.dataset.bkind; if(ui.budgetKind==='income') ui.selCat=null; render(); });
+  if(kind==='income'){ wrap.append(incomeTable()); return wrap; }
   const t=document.createElement('div'); t.className='btable';
   t.innerHTML=`<div class="brow-h"><div>${T('col_category')}</div><div class="num">${T('col_assigned')}</div><div class="num c-act">${T('col_activity')}</div><div class="num">${T('col_available')}</div></div>`;
   const m=ui.month;
@@ -1054,8 +1092,74 @@ function budgetView(){
   wrap.querySelectorAll('[data-assign]').forEach(el=>el.onclick=e=>{e.stopPropagation();editAssign(el);});
   wrap.querySelectorAll('[data-addcat]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAddCategory(b.dataset.addcat);});
   wrap.querySelectorAll('[data-addsub]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAddSub(b.dataset.addsub);});
-  foot.querySelector('#addSectionBtn').onclick=openAddGroup;
+  foot.querySelector('#addSectionBtn').onclick=()=>openAddGroup('expense');
   return wrap;
+}
+
+// Income forecast table: Expected / Actual / Difference, rolled up per month
+function incomeTable(){
+  const t=document.createElement('div'); t.className='btable income';
+  t.innerHTML=`<div class="brow-h"><div>${T('income_by_source')}</div><div class="num">${T('col_expected')}</div><div class="num">${T('col_actual')}</div><div class="num">${T('col_difference')}</div></div>`;
+  const m=ui.month;
+  const rowHtml=(node,level)=>{
+    const kids=nodeKids(node), hasKids=kids.length>0, coll=!!ui.collapsed[node.id];
+    const exp=rolled(node,m,expected), act=rolled(node,m,activity), diff=act-exp;
+    const dcls=diff<0?'neg':diff>0?'pos':'zero';
+    const caret = hasKids ? `<span class="caret ${coll?'c':''}" data-caret="${node.id}">▼</span>` : `<span class="caret-sp"></span>`;
+    return `<div class="cat-row lvl${level} ${hasKids?'is-parent':''}" data-cat="${node.id}">
+      <div class="cat-name"><div class="nm">${caret}<span class="nm-txt">${node.name}</span></div></div>
+      <div class="assigned-cell"><span class="val" data-expect="${node.id}">${fmt(exp)}</span></div>
+      <div class="num">${act?fmt(act):'—'}</div>
+      <div class="num"><span class="avail-pill ${dcls}">${diff>0?'+':''}${fmt(diff)}</span></div>
+    </div>`;
+  };
+  const root=incomeRoot();
+  if(!root.length){ const e=document.createElement('div'); e.className='insp-empty'; e.style.padding='var(--sp4,24px)'; e.textContent=T('no_match'); }
+  root.forEach(sec=>{
+    if(sec.archived) return;
+    let html=rowHtml(sec,1);
+    if(!ui.collapsed[sec.id]){
+      (sec.categories||[]).forEach(cat=>{
+        if(cat.archived) return;
+        html+=rowHtml(cat,2);
+        if(!ui.collapsed[cat.id]){
+          (cat.subs||[]).forEach(sub=>{ if(sub.archived) return; html+=rowHtml(sub,3); });
+          html+=`<button class="add-cat lvl3" data-addsub="${cat.id}">${T('add_subcategory')}</button>`;
+        }
+      });
+      html+=`<button class="add-cat lvl2" data-addcat="${sec.id}">${T('add_category')}</button>`;
+    }
+    const secEl=document.createElement('div'); secEl.className='cat-group'; secEl.innerHTML=html; t.append(secEl);
+  });
+  const foot=document.createElement('div'); foot.className='table-foot';
+  foot.innerHTML=`<button class="btn ghost" id="addIncSectionBtn">${T('add_section')}</button>`;
+  t.append(foot);
+  // events
+  t.querySelectorAll('[data-caret]').forEach(c=>c.onclick=e=>{e.stopPropagation();const id=c.dataset.caret;ui.collapsed[id]=!ui.collapsed[id];render();});
+  t.querySelectorAll('[data-expect]').forEach(el=>el.onclick=e=>{e.stopPropagation();editExpected(el);});
+  t.querySelectorAll('[data-addcat]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAddCategory(b.dataset.addcat);});
+  t.querySelectorAll('[data-addsub]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAddSub(b.dataset.addsub);});
+  foot.querySelector('#addIncSectionBtn').onclick=()=>openAddGroup('income');
+  return t;
+}
+
+function editExpected(el){
+  const catId=el.dataset.expect, m=ui.month;
+  const node=catById(catId), kids=node?nodeKids(node):[];
+  const childSum = kids.filter(k=>!k.archived).reduce((s,k)=>s+rolled(k,m,expected),0);
+  const shown = childSum + expected(catId,m);
+  const inp=document.createElement('input'); inp.type='text'; inp.value=(shown/100).toFixed(2).replace('.',',');
+  el.replaceWith(inp); inp.focus(); inp.select();
+  const commit=()=>{
+    let v=parseAmt(inp.value);
+    if(v<childSum) v=childSum;
+    if(!state.expected) state.expected={};
+    if(!state.expected[m]) state.expected[m]={};
+    state.expected[m][catId] = v - childSum;
+    save(); render();
+  };
+  inp.onkeydown=e=>{if(e.key==='Enter')commit(); if(e.key==='Escape')render();};
+  inp.onblur=commit;
 }
 
 function editAssign(el){
@@ -1160,8 +1264,9 @@ function deleteCategory(nodeId){
   const info=catTxnInfo(nodeId);
   if(info.count>0){ toast(T('cant_delete_txn', info.count, info.lastDate)); return; }
   const node=catById(nodeId); if(!node) return;
+  const loc=catLoc(nodeId);
   const ids=new Set(); const collect=n=>{ ids.add(n.id); nodeKids(n).forEach(collect); }; collect(node);
-  state.groups=state.groups.filter(sec=>{
+  const prune=arr=>arr.filter(sec=>{
     if(sec.id===nodeId) return false;
     sec.categories=(sec.categories||[]).filter(cat=>{
       if(cat.id===nodeId) return false;
@@ -1170,8 +1275,11 @@ function deleteCategory(nodeId){
     });
     return true;
   });
+  if(loc && loc.root===incomeRoot()) state.incomeGroups=prune(incomeRoot());
+  else state.groups=prune(state.groups);
   state.transactions.forEach(t=>{ if(ids.has(t.categoryId)) t.categoryId=null; });     // orphaned txns → uncategorized
   for(const mm of Object.values(state.assignments)) ids.forEach(id=>{ delete mm[id]; });  // drop assignments
+  for(const mm of Object.values(state.expected||{})) ids.forEach(id=>{ delete mm[id]; }); // drop expected income
   ui.selCat=null; render();
 }
 function openAddSub(catId){
@@ -1190,12 +1298,13 @@ function openAddSub(catId){
 let dragCat=null;
 // locate a node: which array holds it, its index and level
 function catLoc(id){
-  const g=state.groups;
-  for(let i=0;i<g.length;i++){ if(g[i].id===id) return {arr:g,idx:i,level:1};
-    const cats=g[i].categories||[];
-    for(let j=0;j<cats.length;j++){ if(cats[j].id===id) return {arr:cats,idx:j,level:2,parent:g[i]};
-      const subs=cats[j].subs||[];
-      for(let k=0;k<subs.length;k++){ if(subs[k].id===id) return {arr:subs,idx:k,level:3,parent:cats[j]}; }
+  for(const g of [state.groups, incomeRoot()]){
+    for(let i=0;i<g.length;i++){ if(g[i].id===id) return {arr:g,idx:i,level:1,root:g};
+      const cats=g[i].categories||[];
+      for(let j=0;j<cats.length;j++){ if(cats[j].id===id) return {arr:cats,idx:j,level:2,parent:g[i],root:g};
+        const subs=cats[j].subs||[];
+        for(let k=0;k<subs.length;k++){ if(subs[k].id===id) return {arr:subs,idx:k,level:3,parent:cats[j],root:g}; }
+      }
     }
   }
   return null;
@@ -1204,6 +1313,7 @@ function catLoc(id){
 function moveCatNode(dragId,targetId,mode){
   if(dragId===targetId) return;
   const from=catLoc(dragId); if(!from) return;
+  const tloc=catLoc(targetId); if(!tloc || tloc.root!==from.root) return;   // stay within the same tree
   const node=from.arr[from.idx];
   let destArr, destIdx;
   if(mode==='into'){
@@ -1213,8 +1323,8 @@ function moveCatNode(dragId,targetId,mode){
     else return;
     destIdx=destArr.length;
   } else {
-    const tl=catLoc(targetId); if(!tl || tl.level!==from.level) return;
-    destArr=tl.arr; destIdx=tl.idx + (mode==='after'?1:0);
+    if(tloc.level!==from.level) return;
+    destArr=tloc.arr; destIdx=tloc.idx + (mode==='after'?1:0);
   }
   from.arr.splice(from.idx,1);
   if(from.arr===destArr && from.idx<destIdx) destIdx--;
@@ -1227,7 +1337,8 @@ function catCell(t){
   if(t.type==='transfer') return `<span class="pill-cat transfer">⇄ ${acctName(t.transferAccountId)}</span>`;
   if(t.type==='pocket'){ const p=pocketById(t.pocketId); return `<span class="pill-cat pocket">▣ ${p?p.name:T('pocket')}</span>`; }
   if(t.categoryId===RTA()) return `<span class="pill-cat income">${T('pill_income')}</span>`;
-  if(t.categoryId){ const c=catById(t.categoryId); return `<span class="pill-cat">${c?c.name:'—'}</span>`; }
+  if(t.categoryId){ const c=catById(t.categoryId); const income=isIncomeCat(t.categoryId);
+    return `<span class="pill-cat${income?' income':''}">${c?c.name:'—'}</span>`; }
   return `<span class="pill-cat">${T('pill_uncat')}</span>`;
 }
 function accountsView(){
@@ -1332,9 +1443,10 @@ function accountDetailsPanel(){
 
 /* ---------- DASHBOARD / KONTA / REPORTS ---------- */
 function monthStats(m){
-  const income = state.transactions.filter(t=>txnMonth(t)===m && t.amount>0 && t.categoryId===RTA() && !t.starting).reduce((s,t)=>s+t.amount,0);
+  const inc=incomeIdSet();
+  const income = state.transactions.filter(t=>txnMonth(t)===m && t.amount>0 && (t.categoryId===RTA()||inc.has(t.categoryId)) && !t.starting).reduce((s,t)=>s+t.amount,0);
   const spendByCat={};
-  state.transactions.filter(t=>txnMonth(t)===m && t.categoryId && t.categoryId!==RTA()).forEach(t=>{ spendByCat[t.categoryId]=(spendByCat[t.categoryId]||0)+t.amount; });
+  state.transactions.filter(t=>txnMonth(t)===m && t.categoryId && t.categoryId!==RTA() && !inc.has(t.categoryId)).forEach(t=>{ spendByCat[t.categoryId]=(spendByCat[t.categoryId]||0)+t.amount; });
   const spend = Object.values(spendByCat).reduce((s,v)=>s+v,0);   // negative
   return {income, spend, spendByCat};
 }
@@ -1372,8 +1484,10 @@ function categoriesView(){
         <button class="cm-del" data-del="${n.id}" ${hasTx?'disabled':''} title="${hasTx?T('cant_delete_txn',info.count,info.lastDate):T('delete')}">✕</button>
       </div></div>`;
   };
+  const kind=ui.catKind==='income'?'income':'expense';
+  const root=rootForKind(kind);
   let tree='';
-  state.groups.forEach(sec=>{
+  root.forEach(sec=>{
     tree+=rowHtml(sec,1);
     (sec.categories||[]).forEach(cat=>{
       tree+=rowHtml(cat,2);
@@ -1383,14 +1497,18 @@ function categoriesView(){
     tree+=`<button class="cm-addchild" style="padding-left:22px" data-add="${sec.id}" data-level="1">${T('add_category')}</button>`;
   });
   el.innerHTML=`<div class="rep-panel"><h3>${T('cat_manager')}</h3>
+    <div class="seg-toggle" style="margin-bottom:14px">
+      <button class="${kind==='expense'?'on':''}" data-ckind="expense">${T('tab_spending')}</button>
+      <button class="${kind==='income'?'on':''}" data-ckind="income">${T('tab_income')}</button></div>
     <div class="tgt-txt" style="margin-bottom:14px">${T('cat_hint')}</div>
     <div id="catTree">${tree||`<div class="tgt-txt">—</div>`}</div>
     <button class="btn ghost" id="addSecBtn" style="margin-top:14px">${T('add_section')}</button></div>`;
+  el.querySelectorAll('[data-ckind]').forEach(b=>b.onclick=()=>{ ui.catKind=b.dataset.ckind; render(); });
   el.querySelectorAll('.cm-name').forEach(inp=>inp.onchange=()=>{ const n=catById(inp.dataset.id); if(n){ const v=inp.value.trim(); if(v){ n.name=v; save(); } else inp.value=n.name; } });
   el.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{ (+b.dataset.level===1?openAddCategory:openAddSub)(b.dataset.add); });
   el.querySelectorAll('[data-arch]').forEach(b=>b.onclick=()=>toggleArchive(b.dataset.arch));
   el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(b.disabled) return; if(confirm(T('del_node_confirm'))) deleteCategory(b.dataset.del); });
-  el.querySelector('#addSecBtn').onclick=openAddGroup;
+  el.querySelector('#addSecBtn').onclick=()=>openAddGroup(kind);
   // drag & drop: grip starts the drag, the row is the drop target
   const clearDrop=()=>el.querySelectorAll('.cm-row').forEach(r=>r.classList.remove('drop-before','drop-after','drop-into'));
   el.querySelectorAll('.cm-row').forEach(row=>{
@@ -1460,18 +1578,18 @@ function wirePayeeCombo(scope, getCatId){
   inp.onfocus=draw; inp.oninput=draw;
   inp.onblur=()=>setTimeout(()=>list.classList.remove('show'),150);
 }
-function wireCatCombos(scope){
+function wireCatCombos(scope, getNodes){
+  const getN = getNodes || (()=>allCats());
   scope.querySelectorAll('.cc-input').forEach(inp=>{
     const hidden=scope.querySelector('#'+inp.dataset.combo);
     const list=inp.parentElement.querySelector('.cc-list');
-    const nodes=allCats();
     let active=-1;
     const selPath=()=>hidden.value?nodePathById(hidden.value):'';
     const opts=()=>[...list.querySelectorAll('.cc-opt')];
     const highlight=()=>{ opts().forEach((o,i)=>o.classList.toggle('active',i===active)); const a=opts()[active]; if(a) a.scrollIntoView({block:'nearest'}); };
     const draw=q=>{
       const ql=(q||'').toLowerCase().trim();
-      const items=nodes.filter(n=>!ql||n.path.toLowerCase().includes(ql));
+      const items=getN().filter(n=>!ql||n.path.toLowerCase().includes(ql));
       list.innerHTML=items.length?items.map(n=>`<div class="cc-opt ${n.id===hidden.value?'sel':''} lvl${n.level}" data-id="${n.id}">${ccHighlight(n.path,ql)}</div>`).join(''):`<div class="cc-empty">${T('no_match')}</div>`;
       active=-1;
       list.querySelectorAll('.cc-opt').forEach(o=>o.onmousedown=e=>{ e.preventDefault(); pick(o.dataset.id); });
@@ -1511,16 +1629,18 @@ function openAddTxn(){
       <div class="field" id="txCatField"><label>${T('category')}</label>${catComboHTML('txCat','')}</div>
     </div>
     <div class="modal-f"><button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="txSave">${T('save')}</button></div></div>`);
-  wireCatCombos(modalHost);
   const $=s=>modalHost.querySelector(s);
   let type='out';
-  wirePayeeCombo(modalHost, ()=> type==='in'?RTA():($('#txCat').value||''));
-  const setSeg=t=>{ type=t;
+  wireCatCombos(modalHost, ()=> allCats(type==='in'?incomeRoot():state.groups));
+  wirePayeeCombo(modalHost, ()=> $('#txCat').value||'');
+  const clearCat=()=>{ $('#txCat').value=''; const ci=modalHost.querySelector('.cc-input'); if(ci) ci.value=''; };
+  const setSeg=t=>{ const prev=type; type=t;
     [['out','#segOut'],['in','#segIn'],['tr','#segTr']].forEach(([k,s])=>$(s).classList.toggle('on',k===t));
     $('#normalFields').style.display=t==='tr'?'none':'block';
     $('#transferFields').style.display=t==='tr'?'block':'none';
     $('#txPayeeField').style.display=t==='tr'?'none':'block';
-    $('#txCatField').style.display=t==='out'?'block':'none';
+    $('#txCatField').style.display=t==='tr'?'none':'block';
+    if((prev==='in')!==(t==='in')) clearCat();   // switching between income/expense trees resets the picker
   };
   $('#segOut').onclick=()=>setSeg('out'); $('#segIn').onclick=()=>setSeg('in'); $('#segTr').onclick=()=>setSeg('tr');
   $('#txSave').onclick=()=>{
@@ -1531,7 +1651,8 @@ function openAddTxn(){
       if(from.accountId===to.accountId && (from.pocketId||null)===(to.pocketId||null)){toast(T('diff_places'));return;}
       doTransfer(from,to,amt,date); closeModal(); toast(T('transfer_done')); render(); return;
     }
-    const payee=$('#txPayee').value.trim(), cid=type==='in'?RTA():$('#txCat').value;
+    const payee=$('#txPayee').value.trim();
+    const cid = type==='in' ? ($('#txCat').value||RTA()) : $('#txCat').value;   // uncategorized income still lands in Ready to Assign
     state.transactions.push({id:uid('t'),seq:nextSeq(),date,accountId:$('#txAcct').value,
       payee:payee||T('unnamed'), categoryId:cid,
       amount: type==='in'?amt:-amt, memo:'', cleared:false});
@@ -1561,15 +1682,16 @@ function openEditTxn(id){
     <div class="modal-f">
       <button class="mini-btn" id="txDel" style="background:none;color:var(--red);width:auto;margin:0 auto 0 0;padding:8px 2px">${T('delete')}</button>
       <button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="txSave">${T('save')}</button></div></div>`);
-  wireCatCombos(modalHost);
   const $=s=>modalHost.querySelector(s);
-  let type = t.categoryId===RTA() ? 'in' : 'out';
-  wirePayeeCombo(modalHost, ()=> type==='in'?RTA():($('#txCat').value||''));
-  const setSeg=k=>{ type=k;
+  let type = (t.categoryId===RTA()||isIncomeCat(t.categoryId)) ? 'in' : 'out';
+  wireCatCombos(modalHost, ()=> allCats(type==='in'?incomeRoot():state.groups));
+  wirePayeeCombo(modalHost, ()=> $('#txCat').value||'');
+  const clearCat=()=>{ $('#txCat').value=''; const ci=modalHost.querySelector('.cc-input'); if(ci) ci.value=''; };
+  const setSeg=k=>{ const prev=type; type=k;
     $('#segOut').classList.toggle('on',k==='out'); $('#segIn').classList.toggle('on',k==='in');
-    $('#txCatField').style.display=k==='out'?'block':'none';
+    if((prev==='in')!==(k==='in')) clearCat();
   };
-  setSeg(type);
+  $('#segOut').classList.toggle('on',type==='out'); $('#segIn').classList.toggle('on',type==='in');
   $('#segOut').onclick=()=>setSeg('out'); $('#segIn').onclick=()=>setSeg('in');
   $('#txSave').onclick=()=>{
     const amt=parseAmt($('#txAmt').value); if(!amt){toast(T('enter_amount'));return;}
@@ -1577,7 +1699,7 @@ function openEditTxn(id){
     t.date=$('#txDate').value;
     t.accountId=$('#txAcct').value;
     t.payee=payee||T('unnamed');
-    t.categoryId = type==='in' ? RTA() : $('#txCat').value;
+    t.categoryId = type==='in' ? ($('#txCat').value||RTA()) : $('#txCat').value;
     t.amount = type==='in' ? amt : -amt;
     rememberPayee(t.categoryId, payee);
     closeModal(); toast(T('changes_saved')); render();
@@ -1761,18 +1883,18 @@ function openAddCategory(groupId){
   modalHost.querySelector('#catName').focus();
   modalHost.querySelector('#catSave').onclick=()=>{
     const name=modalHost.querySelector('#catName').value.trim(); if(!name){return;}
-    const g=state.groups.find(x=>x.id===groupId); g.categories.push({id:uid('c'),name,target:null});
+    const g=catById(groupId); if(!g){closeModal();return;} (g.categories=g.categories||[]).push({id:uid('c'),name,target:null});
     closeModal(); render();
   };
 }
-function openAddGroup(){
+function openAddGroup(kind){
   openModal(`<div class="modal"><div class="modal-h"><h3>${T('new_group')}</h3><button class="x" data-close>×</button></div>
     <div class="modal-b"><div class="field"><label>${T('group_name')}</label><input id="grName" type="text" placeholder="${T('group_ph')}"></div></div>
     <div class="modal-f"><button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="grSave">${T('add')}</button></div></div>`);
   modalHost.querySelector('#grName').focus();
   modalHost.querySelector('#grSave').onclick=()=>{
     const name=modalHost.querySelector('#grName').value.trim(); if(!name)return;
-    state.groups.push({id:uid('g'),name,categories:[]}); closeModal(); render();
+    rootForKind(kind).push({id:uid('g'),name,categories:[]}); closeModal(); render();
   };
 }
 
