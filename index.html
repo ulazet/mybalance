@@ -223,8 +223,10 @@
   .cm-actions{display:flex;gap:4px;flex:0 0 auto;}
   .cm-actions button{width:30px;height:30px;border-radius:var(--r-sm);color:var(--ink-soft);font-size:1rem;}
   .cm-del:hover{background:var(--red-bg);color:var(--red);}
-  .cm-addchild{display:block;width:100%;text-align:left;padding:7px 9px;font-size:.8rem;font-weight:600;color:var(--ink-soft);border-radius:var(--r-sm);border-bottom:1px solid var(--line);}
-  .cm-addchild:hover{color:var(--brand);background:var(--surface-2);}
+  /* per-row "add child" — appears on row hover, adds one level down (section→category, category→subcategory) */
+  .cm-add{font-size:1.15rem!important;line-height:1;opacity:0;transition:opacity .12s;}
+  .cm-row:hover .cm-add, .cm-add:focus-visible{opacity:1;}
+  .cm-add:hover{background:var(--surface-2);color:var(--brand);}
   .cm-del:disabled{opacity:.28;cursor:not-allowed;}
   .cm-del:disabled:hover{background:none;color:var(--ink-soft);}
   .cm-actions .cm-toggle{width:34px;height:20px;border-radius:999px;background:var(--line);position:relative;padding:0;flex:0 0 auto;transition:.15s;}
@@ -238,9 +240,10 @@
   .cm-row.drop-after{box-shadow:inset 0 -2px 0 var(--brand);}
   .cm-row.drop-into{background:var(--surface-2);box-shadow:inset 0 0 0 2px var(--brand);}
   /* collapse carets + child count */
-  .cm-caret{flex:0 0 auto;width:12px;text-align:center;cursor:pointer;color:var(--ink-soft);font-size:.58rem;transition:transform .15s;user-select:none;}
+  .cm-caret{flex:0 0 auto;width:14px;text-align:center;cursor:pointer;color:var(--ink);font-size:.72rem;font-weight:700;transition:transform .15s;user-select:none;}
+  .cm-caret:hover{color:var(--brand);}
   .cm-caret.open{transform:rotate(90deg);}
-  .cm-caret-sp{flex:0 0 auto;width:12px;}
+  .cm-caret-sp{flex:0 0 auto;width:14px;}
   .cm-count{flex:0 0 auto;font-size:.66rem;color:var(--ink-soft);background:var(--surface-2);padding:1px 8px;border-radius:var(--r-pill);}
   /* between-row hover insert (+) */
   .cm-ins{position:relative;height:10px;cursor:pointer;}
@@ -1518,8 +1521,10 @@ function categoriesView(){
     const info=catTxnInfo(n.id), hasTx=info.count>0;
     const canHold=level<3, open=!!exp[n.id];
     const kidN=canHold?nodeKids(n).length:0;
-    const caret = canHold ? `<span class="cm-caret ${open?'open':''}" data-caret="${n.id}">▸</span>` : `<span class="cm-caret-sp"></span>`;
+    // caret only when there's actually something underneath; otherwise a spacer keeps names aligned
+    const caret = (canHold && kidN) ? `<span class="cm-caret ${open?'open':''}" data-caret="${n.id}">▸</span>` : `<span class="cm-caret-sp"></span>`;
     const count = (canHold && !open && kidN) ? `<span class="cm-count">${kidN}</span>` : '';
+    const addBtn = canHold ? `<button class="cm-add" data-addchild="${n.id}" data-level="${level}" title="${level===1?T('add_category'):T('add_subcategory')}">＋</button>` : '';
     return `<div class="cm-row lvl${level} ${n.archived?'archived':''}" data-id="${n.id}" data-level="${level}">
       <span class="cm-grip" draggable="true">⠿</span>
       ${caret}
@@ -1527,11 +1532,11 @@ function categoriesView(){
       ${count}
       ${n.archived?`<span class="cm-tag">${T('disabled_label')}</span>`:''}
       <div class="cm-actions">
+        ${addBtn}
         <button class="cm-toggle ${n.archived?'':'on'}" data-arch="${n.id}" role="switch" aria-checked="${!n.archived}" title="${n.archived?T('enable'):T('disable')}"><span class="knob"></span></button>
         <button class="cm-del" data-del="${n.id}" ${hasTx?'disabled':''} title="${hasTx?T('cant_delete_txn',info.count,info.lastDate):T('delete')}">✕</button>
       </div></div>`;
   };
-  const insHtml=(pid,level,index)=>`<div class="cm-ins ${level===1?'addcat':'addsub'}" data-add="${pid}" data-level="${level}" data-index="${index}"><button class="cm-ins-btn" title="${level===1?T('add_category'):T('add_subcategory')}">+</button></div>`;
   const insSec=index=>`<div class="cm-ins addsec" data-level="0" data-index="${index}"><button class="cm-ins-btn" title="${T('add_section')}">+</button></div>`;
   const kind=ui.catKind==='income'?'income':'expense';
   const root=rootForKind(kind);
@@ -1541,15 +1546,12 @@ function categoriesView(){
     tree+=rowHtml(sec,1);
     if(exp[sec.id]){
       const cats=sec.categories||[];
-      tree+=insHtml(sec.id,1,0);
       cats.forEach((cat,ci)=>{
         tree+=rowHtml(cat,2);
         if(exp[cat.id]){
           const subs=cat.subs||[];
-          tree+=insHtml(cat.id,2,0);
-          subs.forEach((sub,si2)=>{ tree+=rowHtml(sub,3); tree+=insHtml(cat.id,2,si2+1); });
+          subs.forEach(sub=>{ tree+=rowHtml(sub,3); });
         }
-        tree+=insHtml(sec.id,1,ci+1);
       });
     }
     tree+=insSec(si+1);                             // add a section after this one
@@ -1569,9 +1571,8 @@ function categoriesView(){
   el.querySelector('#seedSnapBtn').onclick=openSeedExport;
   el.querySelector('#expandAllBtn').onclick=()=>{ toggleExpandAll(root); render(); };
   el.querySelectorAll('[data-caret]').forEach(c=>c.onclick=()=>{ ui.catExpanded[c.dataset.caret]=!ui.catExpanded[c.dataset.caret]; render(); });
-  el.querySelectorAll('.cm-ins-btn').forEach(b=>b.onclick=()=>{ const s=b.closest('.cm-ins'); const lvl=+s.dataset.level, idx=+s.dataset.index;
-    if(lvl===0){ openAddGroup(kind, idx); return; }                     // inline add a section
-    const pid=s.dataset.add; ui.catExpanded[pid]=true; (lvl===1?openAddCategory:openAddSub)(pid, idx); });
+  el.querySelectorAll('.cm-ins-btn').forEach(b=>b.onclick=()=>{ const s=b.closest('.cm-ins'); const idx=+s.dataset.index; openAddGroup(kind, idx); });  // inline add a section
+  el.querySelectorAll('[data-addchild]').forEach(b=>b.onclick=()=>{ const id=b.dataset.addchild, lvl=+b.dataset.level; ui.catExpanded[id]=true; (lvl===1?openAddCategory:openAddSub)(id); });
   el.querySelectorAll('.cm-name').forEach(inp=>inp.onchange=()=>{ const n=catById(inp.dataset.id); if(n){ const v=inp.value.trim(); if(v){ n.name=v; save(); } else inp.value=n.name; } });
   el.querySelectorAll('[data-arch]').forEach(b=>b.onclick=()=>toggleArchive(b.dataset.arch));
   el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(b.disabled) return; if(confirm(T('del_node_confirm'))) deleteCategory(b.dataset.del); });
