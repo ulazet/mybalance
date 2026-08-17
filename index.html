@@ -222,8 +222,9 @@
   .cm-name:focus{border-color:var(--accent);background:var(--surface);}
   .cm-actions{display:flex;gap:4px;flex:0 0 auto;}
   .cm-actions button{width:30px;height:30px;border-radius:var(--r-sm);color:var(--ink-soft);font-size:1rem;}
-  .cm-add:hover{background:var(--surface-2);color:var(--brand);}
   .cm-del:hover{background:var(--red-bg);color:var(--red);}
+  .cm-addchild{display:block;width:100%;text-align:left;padding:7px 9px;font-size:.8rem;font-weight:600;color:var(--ink-soft);border-radius:var(--r-sm);border-bottom:1px solid var(--line);}
+  .cm-addchild:hover{color:var(--brand);background:var(--surface-2);}
   .cm-del:disabled{opacity:.28;cursor:not-allowed;}
   .cm-del:disabled:hover{background:none;color:var(--ink-soft);}
   .cm-actions .cm-toggle{width:34px;height:20px;border-radius:999px;background:var(--line);position:relative;padding:0;flex:0 0 auto;transition:.15s;}
@@ -1368,7 +1369,6 @@ function categoriesView(){
       ${n.archived?`<span class="cm-tag">${T('disabled_label')}</span>`:''}
       <div class="cm-actions">
         <button class="cm-toggle ${n.archived?'':'on'}" data-arch="${n.id}" role="switch" aria-checked="${!n.archived}" title="${n.archived?T('enable'):T('disable')}"><span class="knob"></span></button>
-        ${level<3?`<button class="cm-add" data-add="${n.id}" data-level="${level}" title="${level===1?T('add_category'):T('add_subcategory')}">＋</button>`:''}
         <button class="cm-del" data-del="${n.id}" ${hasTx?'disabled':''} title="${hasTx?T('cant_delete_txn',info.count,info.lastDate):T('delete')}">✕</button>
       </div></div>`;
   };
@@ -1378,7 +1378,9 @@ function categoriesView(){
     (sec.categories||[]).forEach(cat=>{
       tree+=rowHtml(cat,2);
       (cat.subs||[]).forEach(sub=>{ tree+=rowHtml(sub,3); });
+      tree+=`<button class="cm-addchild" style="padding-left:44px" data-add="${cat.id}" data-level="2">${T('add_subcategory')}</button>`;
     });
+    tree+=`<button class="cm-addchild" style="padding-left:22px" data-add="${sec.id}" data-level="1">${T('add_category')}</button>`;
   });
   el.innerHTML=`<div class="rep-panel"><h3>${T('cat_manager')}</h3>
     <div class="tgt-txt" style="margin-bottom:14px">${T('cat_hint')}</div>
