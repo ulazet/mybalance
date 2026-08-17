@@ -224,6 +224,13 @@
   .cm-actions button{width:30px;height:30px;border-radius:var(--r-sm);color:var(--ink-soft);font-size:1rem;}
   .cm-add:hover{background:var(--surface-2);color:var(--brand);}
   .cm-del:hover{background:var(--red-bg);color:var(--red);}
+  .cm-del:disabled{opacity:.28;cursor:not-allowed;}
+  .cm-del:disabled:hover{background:none;color:var(--ink-soft);}
+  .cm-arch{color:var(--green);font-size:.7rem;}
+  .cm-arch:hover{background:var(--surface-2);}
+  .cm-tag{font-size:.64rem;color:var(--ink-soft);background:var(--surface-2);padding:2px 7px;border-radius:var(--r-pill);flex:0 0 auto;}
+  .cm-row.archived .cm-name{color:var(--ink-soft);text-decoration:line-through;opacity:.75;}
+  .cm-row.archived .cm-arch{color:var(--ink-soft);}
   .cm-row.dragging{opacity:.4;}
   .cm-row.drop-before{box-shadow:inset 0 2px 0 var(--brand);}
   .cm-row.drop-after{box-shadow:inset 0 -2px 0 var(--brand);}
@@ -241,6 +248,11 @@
   .cc-opt b{color:var(--brand);}
   .cc-opt.lvl1{font-weight:700;}
   .cc-empty{padding:10px;font-size:.85rem;color:var(--ink-soft);text-align:center;}
+  .payee-combo{position:relative;}
+  .cc-opt.payee-opt{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 6px 4px 10px;}
+  .po-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;padding:4px 0;}
+  .po-del{width:26px;height:26px;border-radius:var(--r-sm);color:var(--ink-soft);font-size:1.05rem;flex:0 0 auto;}
+  .po-del:hover{background:var(--red-bg);color:var(--red);}
   .table-foot{padding:12px 4px;display:flex;justify-content:center;}
 
   /* ============ INSPECTOR ============ */
@@ -571,7 +583,8 @@ const I18N = {
     new_section:'New section', new_subcategory:'New subcategory', section_name:'Section name', subcategory_name:'Subcategory name',
     del_node_confirm:'Delete this and everything inside it? Its transactions will become uncategorized.',
     branch:'branch', uncategorized:'Uncategorized', cat_hint:'Add, rename, delete and nest categories (3 levels). Assign budget on any level.',
-    search_category:'Search category…', no_match:'No matches', pick_category:'Pick a category'
+    search_category:'Search category…', no_match:'No matches', pick_category:'Pick a category',
+    enable:'Enable', disable:'Disable', disabled_label:'disabled', cant_delete_txn:"Can't delete — it has transactions. Disable it instead."
   },
   pl:{
     tagline:'Budżet domowy · PLN', ready_to_assign:'Do<br>przypisania', rta_tip:'Kliknij, aby sfinansować cele miesięczne',
@@ -625,7 +638,8 @@ const I18N = {
     new_section:'Nowa sekcja', new_subcategory:'Nowa podkategoria', section_name:'Nazwa sekcji', subcategory_name:'Nazwa podkategorii',
     del_node_confirm:'Usunąć to i całą zawartość? Powiązane transakcje stracą kategorię.',
     branch:'gałąź', uncategorized:'Bez kategorii', cat_hint:'Dodawaj, zmieniaj i usuwaj kategorie (3 poziomy). Przypisuj budżet na dowolnym poziomie.',
-    search_category:'Szukaj kategorii…', no_match:'Brak wyników', pick_category:'Wybierz kategorię'
+    search_category:'Szukaj kategorii…', no_match:'Brak wyników', pick_category:'Wybierz kategorię',
+    enable:'Włącz', disable:'Wyłącz', disabled_label:'wyłączona', cant_delete_txn:'Nie można usunąć — ma transakcje. Zamiast tego wyłącz.'
   }
 };
 function T(k,...a){ let v=(I18N[LANG]&&I18N[LANG][k]); if(v==null) v=I18N.en[k]; if(v==null) return k; return typeof v==='function'?v(...a):v; }
@@ -753,7 +767,24 @@ function seed(){
 }
 
 /* ---------- PERSISTENCE ---------- */
-function normalize(s){ (s.accounts||[]).forEach(a=>{ if(a.number==null)a.number=''; if(a.creditLimit==null)a.creditLimit=0; delete a.availableOverride; if(!Array.isArray(a.pockets))a.pockets=[]; }); return s; }
+function normalize(s){
+  (s.accounts||[]).forEach(a=>{ if(a.number==null)a.number=''; if(a.creditLimit==null)a.creditLimit=0; delete a.availableOverride; if(!Array.isArray(a.pockets))a.pockets=[]; });
+  if(!s.payees){                                   // one-time: derive payee memory from existing categorized transactions
+    s.payees={};
+    (s.transactions||[]).forEach(t=>{ if(t.type||t.starting||!t.categoryId||!t.payee) return;
+      (s.payees[t.categoryId]=s.payees[t.categoryId]||[]);
+      if(!s.payees[t.categoryId].includes(t.payee)) s.payees[t.categoryId].push(t.payee); });
+  }
+  return s;
+}
+// remembered payees per category
+function rememberPayee(catId,name){
+  if(!catId||!name||name===T('unnamed')) return;
+  if(!state.payees) state.payees={};
+  (state.payees[catId]=state.payees[catId]||[]);
+  if(!state.payees[catId].includes(name)) state.payees[catId].push(name);
+}
+function deletePayee(catId,name){ if(state.payees&&state.payees[catId]){ state.payees[catId]=state.payees[catId].filter(n=>n!==name); save(); } }
 // give every transaction a monotonic creation sequence (for same-date ordering); backfill by array order
 function initSeq(s){
   seqCounter = (s.transactions||[]).reduce((m,t)=>Math.max(m, t.seq||0), 0);
@@ -813,16 +844,17 @@ function deleteTransaction(id){
 /* ---- category tree: 3 levels (section > category > subcategory); every node is budgetable ---- */
 function nodeKids(n){ return n.categories || n.subs || []; }            // section→categories, category→subs, sub→none
 function eachNode(cb){
-  (state.groups||[]).forEach(sec=>{ cb(sec,'',1,null);
-    (sec.categories||[]).forEach(cat=>{ cb(cat,sec.name,2,sec);
-      (cat.subs||[]).forEach(sub=>cb(sub,sec.name+' › '+cat.name,3,cat));
+  (state.groups||[]).forEach(sec=>{ cb(sec,'',1,null,false); const sa=!!sec.archived;
+    (sec.categories||[]).forEach(cat=>{ cb(cat,sec.name,2,sec,sa); const ca=sa||!!cat.archived;
+      (cat.subs||[]).forEach(sub=>cb(sub,sec.name+' › '+cat.name,3,cat,ca));
     });
   });
 }
-function allCats(){ const o=[]; eachNode((n,pp,level)=>o.push({id:n.id,name:n.name,path:pp?pp+' › '+n.name:n.name,level,target:n.target,node:n})); return o; }
-function catById(id){ let f=null; eachNode(n=>{ if(n.id===id) f=n; }); return f; }
+// pickers exclude archived nodes (and anything under an archived parent)
+function allCats(){ const o=[]; eachNode((n,pp,level,parent,arch)=>{ if(!n.archived&&!arch) o.push({id:n.id,name:n.name,path:pp?pp+' › '+n.name:n.name,level,target:n.target,node:n}); }); return o; }
+function catById(id){ let f=null; eachNode(n=>{ if(n.id===id) f=n; }); return f; }     // finds archived too (for display)
 function nodePathById(id){ let p=''; eachNode((n,pp)=>{ if(n.id===id) p=pp?pp+' › '+n.name:n.name; }); return p; }
-function rolled(n,m,fn){ let s=fn(n.id,m); nodeKids(n).forEach(k=>s+=rolled(k,m,fn)); return s; }   // own + all descendants
+function rolled(n,m,fn){ let s=fn(n.id,m); nodeKids(n).forEach(k=>{ if(!k.archived) s+=rolled(k,m,fn); }); return s; }   // own + active descendants
 
 // activity for a category within a month (sum of txn amounts, spending negative)
 function activity(catId, mKey){
@@ -989,12 +1021,14 @@ function budgetView(){
     </div>`;
   };
   state.groups.forEach(sec=>{
+    if(sec.archived) return;
     let html=rowHtml(sec,1);
     if(!ui.collapsed[sec.id]){
       (sec.categories||[]).forEach(cat=>{
+        if(cat.archived) return;
         html+=rowHtml(cat,2);
         if(!ui.collapsed[cat.id]){
-          (cat.subs||[]).forEach(sub=>{ html+=rowHtml(sub,3); });
+          (cat.subs||[]).forEach(sub=>{ if(sub.archived) return; html+=rowHtml(sub,3); });
           html+=`<button class="add-cat lvl3" data-addsub="${cat.id}">${T('add_subcategory')}</button>`;
         }
       });
@@ -1023,7 +1057,7 @@ function budgetView(){
 function editAssign(el){
   const catId=el.dataset.assign, m=ui.month;
   const node=catById(catId), kids=node?nodeKids(node):[];
-  const childSum = kids.reduce((s,k)=>s+rolled(k,m,assigned),0);   // total assigned beneath this node
+  const childSum = kids.filter(k=>!k.archived).reduce((s,k)=>s+rolled(k,m,assigned),0);   // total assigned beneath this node
   const shown = childSum + assigned(catId,m);                      // what the row displays (rolled total)
   const inp=document.createElement('input'); inp.type='text'; inp.value=(shown/100).toFixed(2).replace('.',',');
   el.replaceWith(inp); inp.focus(); inp.select();
@@ -1108,8 +1142,16 @@ function moveMoney(catId, otherId, amt, dir){
   if(dir==='to'){ add(catId,amt); add(otherId,-amt); }
   else { add(catId,-amt); add(otherId,amt); }
 }
-// delete any node (section / category / subcategory) with everything inside it
+// does this node (or any descendant) have any transaction filed against it?
+function catHasTxns(nodeId){
+  const node=catById(nodeId); if(!node) return false;
+  const ids=new Set(); const collect=n=>{ ids.add(n.id); nodeKids(n).forEach(collect); }; collect(node);
+  return state.transactions.some(t=>ids.has(t.categoryId));
+}
+function toggleArchive(nodeId){ const n=catById(nodeId); if(n){ n.archived=!n.archived; if(n.archived&&ui.selCat===nodeId) ui.selCat=null; save(); render(); } }
+// hard-delete any node — only allowed when it (and its whole branch) has zero transactions
 function deleteCategory(nodeId){
+  if(catHasTxns(nodeId)){ toast(T('cant_delete_txn')); return; }
   const node=catById(nodeId); if(!node) return;
   const ids=new Set(); const collect=n=>{ ids.add(n.id); nodeKids(n).forEach(collect); }; collect(node);
   state.groups=state.groups.filter(sec=>{
@@ -1312,13 +1354,18 @@ function kontaView(){
 /* ---------- CATEGORIES MANAGER ---------- */
 function categoriesView(){
   const el=document.createElement('div'); el.style.maxWidth='760px'; el.style.margin='0 auto';
-  const rowHtml=(n,level)=>`<div class="cm-row lvl${level}" data-id="${n.id}" data-level="${level}">
+  const rowHtml=(n,level)=>{
+    const hasTx=catHasTxns(n.id);
+    return `<div class="cm-row lvl${level} ${n.archived?'archived':''}" data-id="${n.id}" data-level="${level}">
       <span class="cm-grip" draggable="true">⠿</span>
       <input class="cm-name" data-id="${n.id}" value="${(n.name||'').replace(/"/g,'&quot;')}">
+      ${n.archived?`<span class="cm-tag">${T('disabled_label')}</span>`:''}
       <div class="cm-actions">
+        <button class="cm-arch" data-arch="${n.id}" title="${n.archived?T('enable'):T('disable')}">${n.archived?'○':'●'}</button>
         ${level<3?`<button class="cm-add" data-add="${n.id}" data-level="${level}" title="${level===1?T('add_category'):T('add_subcategory')}">＋</button>`:''}
-        <button class="cm-del" data-del="${n.id}" title="${T('delete')}">✕</button>
+        <button class="cm-del" data-del="${n.id}" ${hasTx?'disabled':''} title="${hasTx?T('cant_delete_txn'):T('delete')}">✕</button>
       </div></div>`;
+  };
   let tree='';
   state.groups.forEach(sec=>{
     tree+=rowHtml(sec,1);
@@ -1333,7 +1380,8 @@ function categoriesView(){
     <button class="btn ghost" id="addSecBtn" style="margin-top:14px">${T('add_section')}</button></div>`;
   el.querySelectorAll('.cm-name').forEach(inp=>inp.onchange=()=>{ const n=catById(inp.dataset.id); if(n){ const v=inp.value.trim(); if(v){ n.name=v; save(); } else inp.value=n.name; } });
   el.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{ (+b.dataset.level===1?openAddCategory:openAddSub)(b.dataset.add); });
-  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(confirm(T('del_node_confirm'))) deleteCategory(b.dataset.del); });
+  el.querySelectorAll('[data-arch]').forEach(b=>b.onclick=()=>toggleArchive(b.dataset.arch));
+  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(b.disabled) return; if(confirm(T('del_node_confirm'))) deleteCategory(b.dataset.del); });
   el.querySelector('#addSecBtn').onclick=openAddGroup;
   // drag & drop: grip starts the drag, the row is the drop target
   const clearDrop=()=>el.querySelectorAll('.cm-row').forEach(r=>r.classList.remove('drop-before','drop-after','drop-into'));
@@ -1389,6 +1437,21 @@ function catComboHTML(hiddenId, initialId){
   </div>`;
 }
 function ccHighlight(text,q){ if(!q) return text; const i=text.toLowerCase().indexOf(q); if(i<0) return text; return text.slice(0,i)+'<b>'+text.slice(i,i+q.length)+'</b>'+text.slice(i+q.length); }
+function wirePayeeCombo(scope, getCatId){
+  const inp=scope.querySelector('#txPayee'); if(!inp) return;
+  const list=inp.parentElement.querySelector('.cc-list');
+  const esc=s=>(s||'').replace(/"/g,'&quot;');
+  const draw=()=>{
+    const cat=getCatId(), q=(inp.value||'').toLowerCase().trim();
+    const names=((state.payees&&state.payees[cat])||[]).filter(n=>!q||n.toLowerCase().includes(q));
+    list.innerHTML=names.map(n=>`<div class="cc-opt payee-opt"><span class="po-name" data-name="${esc(n)}">${n}</span><button class="po-del" data-del="${esc(n)}" title="${T('delete')}">×</button></div>`).join('');
+    list.querySelectorAll('.po-name').forEach(o=>o.onmousedown=e=>{ e.preventDefault(); inp.value=o.dataset.name; list.classList.remove('show'); });
+    list.querySelectorAll('.po-del').forEach(b=>b.onmousedown=e=>{ e.preventDefault(); e.stopPropagation(); deletePayee(getCatId(), b.dataset.del); draw(); });
+    list.classList.toggle('show', names.length>0);
+  };
+  inp.onfocus=draw; inp.oninput=draw;
+  inp.onblur=()=>setTimeout(()=>list.classList.remove('show'),150);
+}
 function wireCatCombos(scope){
   scope.querySelectorAll('.cc-input').forEach(inp=>{
     const hidden=scope.querySelector('#'+inp.dataset.combo);
@@ -1435,13 +1498,15 @@ function openAddTxn(){
         <div class="field"><label>${T('date')}</label><input id="txDate" type="date" value="${ui.month}-15"></div>
         <div class="field"><label>${T('amount_zl')}</label><input id="txAmt" type="text" placeholder="0,00"></div>
       </div>
-      <div class="field" id="txPayeeField"><label>${T('payee_note')}</label><input id="txPayee" type="text" placeholder="${T('payee_ph')}"></div>
+      <div class="field" id="txPayeeField"><label>${T('payee_note')}</label>
+        <div class="payee-combo"><input id="txPayee" type="text" autocomplete="off" placeholder="${T('payee_ph')}"><div class="cc-list"></div></div></div>
       <div class="field" id="txCatField"><label>${T('category')}</label>${catComboHTML('txCat','')}</div>
     </div>
     <div class="modal-f"><button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="txSave">${T('save')}</button></div></div>`);
   wireCatCombos(modalHost);
   const $=s=>modalHost.querySelector(s);
   let type='out';
+  wirePayeeCombo(modalHost, ()=> type==='in'?RTA():($('#txCat').value||''));
   const setSeg=t=>{ type=t;
     [['out','#segOut'],['in','#segIn'],['tr','#segTr']].forEach(([k,s])=>$(s).classList.toggle('on',k===t));
     $('#normalFields').style.display=t==='tr'?'none':'block';
@@ -1458,10 +1523,11 @@ function openAddTxn(){
       if(from.accountId===to.accountId && (from.pocketId||null)===(to.pocketId||null)){toast(T('diff_places'));return;}
       doTransfer(from,to,amt,date); closeModal(); toast(T('transfer_done')); render(); return;
     }
+    const payee=$('#txPayee').value.trim(), cid=type==='in'?RTA():$('#txCat').value;
     state.transactions.push({id:uid('t'),seq:nextSeq(),date,accountId:$('#txAcct').value,
-      payee:$('#txPayee').value||T('unnamed'),
-      categoryId: type==='in'?RTA():$('#txCat').value,
+      payee:payee||T('unnamed'), categoryId:cid,
       amount: type==='in'?amt:-amt, memo:'', cleared:false});
+    rememberPayee(cid, payee);
     closeModal(); toast(T('txn_added')); render();
   };
 }
@@ -1480,7 +1546,8 @@ function openEditTxn(id){
         <div class="field"><label>${T('date')}</label><input id="txDate" type="date" value="${t.date}"></div>
         <div class="field"><label>${T('amount_zl')}</label><input id="txAmt" type="text" value="${grosz(Math.abs(t.amount))}"></div>
       </div>
-      <div class="field"><label>${T('payee_note')}</label><input id="txPayee" type="text" value="${(t.payee||'').replace(/"/g,'&quot;')}"></div>
+      <div class="field"><label>${T('payee_note')}</label>
+        <div class="payee-combo"><input id="txPayee" type="text" autocomplete="off" value="${(t.payee||'').replace(/"/g,'&quot;')}"><div class="cc-list"></div></div></div>
       <div class="field" id="txCatField"><label>${T('category')}</label>${catComboHTML('txCat', t.categoryId)}</div>
     </div>
     <div class="modal-f">
@@ -1489,6 +1556,7 @@ function openEditTxn(id){
   wireCatCombos(modalHost);
   const $=s=>modalHost.querySelector(s);
   let type = t.categoryId===RTA() ? 'in' : 'out';
+  wirePayeeCombo(modalHost, ()=> type==='in'?RTA():($('#txCat').value||''));
   const setSeg=k=>{ type=k;
     $('#segOut').classList.toggle('on',k==='out'); $('#segIn').classList.toggle('on',k==='in');
     $('#txCatField').style.display=k==='out'?'block':'none';
@@ -1497,11 +1565,13 @@ function openEditTxn(id){
   $('#segOut').onclick=()=>setSeg('out'); $('#segIn').onclick=()=>setSeg('in');
   $('#txSave').onclick=()=>{
     const amt=parseAmt($('#txAmt').value); if(!amt){toast(T('enter_amount'));return;}
+    const payee=$('#txPayee').value.trim();
     t.date=$('#txDate').value;
     t.accountId=$('#txAcct').value;
-    t.payee=$('#txPayee').value||T('unnamed');
+    t.payee=payee||T('unnamed');
     t.categoryId = type==='in' ? RTA() : $('#txCat').value;
     t.amount = type==='in' ? amt : -amt;
+    rememberPayee(t.categoryId, payee);
     closeModal(); toast(T('changes_saved')); render();
   };
   $('#txDel').onclick=()=>{ if(confirm(T('del_txn_confirm'))){ closeModal(); deleteTransaction(t.id); } };
