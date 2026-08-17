@@ -194,6 +194,33 @@
 
   .add-cat{padding:9px 18px;font-size:.82rem;font-weight:600;color:var(--ink-soft);width:100%;text-align:left;}
   .add-cat:hover{color:var(--brand);background:var(--surface-2);}
+  /* budget 3-level tree */
+  .cat-name .nm{display:flex;align-items:center;gap:6px;min-width:0;}
+  .nm-txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .cat-row.lvl1{background:var(--surface-2);}
+  .cat-row.lvl1 .nm-txt{font-weight:700;}
+  .cat-row.lvl2 .cat-name{padding-left:22px;}
+  .cat-row.lvl3 .cat-name{padding-left:44px;}
+  .cat-row.lvl3 .nm-txt{color:var(--ink-soft);}
+  .caret-sp{display:inline-block;width:.75rem;flex:0 0 .75rem;}
+  .caret{flex:0 0 auto;cursor:pointer;}
+  .caret.c{transform:rotate(-90deg);}
+  .branch-sum{font-size:.68rem;color:var(--ink-soft);font-weight:500;margin-left:6px;white-space:nowrap;flex:0 0 auto;}
+  .add-cat.lvl2{padding-left:22px;}
+  .add-cat.lvl3{padding-left:44px;}
+  /* categories manager */
+  .cm-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line);}
+  .cm-row.lvl1{margin-top:10px;}
+  .cm-name{flex:1;border:1px solid transparent;border-radius:var(--r-sm);padding:7px 9px;outline:none;background:transparent;font-size:.92rem;min-width:0;}
+  .cm-row.lvl1 .cm-name{font-weight:700;}
+  .cm-row.lvl2 .cm-name{margin-left:22px;}
+  .cm-row.lvl3 .cm-name{margin-left:44px;font-size:.88rem;color:var(--ink-soft);}
+  .cm-name:hover{border-color:var(--line);background:var(--surface);}
+  .cm-name:focus{border-color:var(--accent);background:var(--surface);}
+  .cm-actions{display:flex;gap:4px;flex:0 0 auto;}
+  .cm-actions button{width:30px;height:30px;border-radius:var(--r-sm);color:var(--ink-soft);font-size:1rem;}
+  .cm-add:hover{background:var(--surface-2);color:var(--brand);}
+  .cm-del:hover{background:var(--red-bg);color:var(--red);}
   .table-foot{padding:12px 4px;display:flex;justify-content:center;}
 
   /* ============ INSPECTOR ============ */
@@ -518,7 +545,12 @@ const I18N = {
     assigned_to_targets:x=>`Assigned ${x} to targets`, all_targets_funded:'All targets already funded',
     exported:'JSON backup exported', invalid_file:'Invalid file', import_confirm:'Import data from file? It will replace the current budget.',
     imported:'Data imported', import_fail:'Could not read the file', synced_other:'Synced from another device',
-    sync_error:'Sync failed — check your connection'
+    sync_error:'Sync failed — check your connection',
+    nav_categories:'Categories', cat_manager:'Category manager', section:'Section', subcategory:'Subcategory',
+    add_section:'+ Add section', add_subcategory:'+ Subcategory', rename:'Rename', set_target:'Target',
+    new_section:'New section', new_subcategory:'New subcategory', section_name:'Section name', subcategory_name:'Subcategory name',
+    del_node_confirm:'Delete this and everything inside it? Its transactions will become uncategorized.',
+    branch:'branch', uncategorized:'Uncategorized', cat_hint:'Add, rename, delete and nest categories (3 levels). Assign budget on any level.'
   },
   pl:{
     tagline:'Budżet domowy · PLN', ready_to_assign:'Do<br>przypisania', rta_tip:'Kliknij, aby sfinansować cele miesięczne',
@@ -566,7 +598,12 @@ const I18N = {
     assigned_to_targets:x=>`Przypisano ${x} do celów`, all_targets_funded:'Wszystkie cele już sfinansowane',
     exported:'Wyeksportowano kopię JSON', invalid_file:'Nieprawidłowy plik', import_confirm:'Zaimportować dane z pliku? Zastąpią obecny budżet.',
     imported:'Zaimportowano dane', import_fail:'Nie udało się wczytać pliku', synced_other:'Zsynchronizowano z innym urządzeniem',
-    sync_error:'Błąd synchronizacji — sprawdź połączenie'
+    sync_error:'Błąd synchronizacji — sprawdź połączenie',
+    nav_categories:'Kategorie', cat_manager:'Menedżer kategorii', section:'Sekcja', subcategory:'Podkategoria',
+    add_section:'+ Dodaj sekcję', add_subcategory:'+ Podkategoria', rename:'Zmień nazwę', set_target:'Cel',
+    new_section:'Nowa sekcja', new_subcategory:'Nowa podkategoria', section_name:'Nazwa sekcji', subcategory_name:'Nazwa podkategorii',
+    del_node_confirm:'Usunąć to i całą zawartość? Powiązane transakcje stracą kategorię.',
+    branch:'gałąź', uncategorized:'Bez kategorii', cat_hint:'Dodawaj, zmieniaj i usuwaj kategorie (3 poziomy). Przypisuj budżet na dowolnym poziomie.'
   }
 };
 function T(k,...a){ let v=(I18N[LANG]&&I18N[LANG][k]); if(v==null) v=I18N.en[k]; if(v==null) return k; return typeof v==='function'?v(...a):v; }
@@ -751,8 +788,19 @@ function deleteTransaction(id){
   else state.transactions=state.transactions.filter(x=>x.id!==id);
   render();
 }
-function allCats(){ const o=[]; state.groups.forEach(g=>g.categories.forEach(c=>o.push({...c,groupId:g.id,groupName:g.name}))); return o; }
-function catById(id){ for(const g of state.groups) for(const c of g.categories) if(c.id===id) return c; return null; }
+/* ---- category tree: 3 levels (section > category > subcategory); every node is budgetable ---- */
+function nodeKids(n){ return n.categories || n.subs || []; }            // section→categories, category→subs, sub→none
+function eachNode(cb){
+  (state.groups||[]).forEach(sec=>{ cb(sec,'',1,null);
+    (sec.categories||[]).forEach(cat=>{ cb(cat,sec.name,2,sec);
+      (cat.subs||[]).forEach(sub=>cb(sub,sec.name+' › '+cat.name,3,cat));
+    });
+  });
+}
+function allCats(){ const o=[]; eachNode((n,pp,level)=>o.push({id:n.id,name:n.name,path:pp?pp+' › '+n.name:n.name,level,target:n.target,node:n})); return o; }
+function catById(id){ let f=null; eachNode(n=>{ if(n.id===id) f=n; }); return f; }
+function nodePathById(id){ let p=''; eachNode((n,pp)=>{ if(n.id===id) p=pp?pp+' › '+n.name:n.name; }); return p; }
+function rolled(n,m,fn){ let s=fn(n.id,m); nodeKids(n).forEach(k=>s+=rolled(k,m,fn)); return s; }   // own + all descendants
 
 // activity for a category within a month (sum of txn amounts, spending negative)
 function activity(catId, mKey){
@@ -805,11 +853,13 @@ const ICON={
   txn:`<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>`,
   konta:`<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h12v3"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V10a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2Z"/><circle cx="17" cy="13.5" r="1.2" fill="currentColor" stroke="none"/></svg>`,
   reports:`<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>`,
+  categories:`<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M8 12h12M12 18h8"/><circle cx="4.5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="8.5" cy="18" r="1" fill="currentColor" stroke="none"/></svg>`,
   more:`<svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>`
 };
 const NAV=[
   {v:'dashboard',k:'nav_dashboard',ico:ICON.dashboard},
   {v:'budget',k:'nav_budget',ico:ICON.budget},
+  {v:'categories',k:'nav_categories',ico:ICON.categories},
   {v:'accounts',k:'nav_transactions',ico:ICON.txn},
   {v:'konta',k:'nav_accounts',ico:ICON.konta},
   {v:'reports',k:'nav_reports',ico:ICON.reports},
@@ -857,6 +907,7 @@ function render(){
   else if(ui.view==='accounts') c.append(accountsView(), accountDetailsPanel());
   else if(ui.view==='dashboard') c.append(dashboardView());
   else if(ui.view==='konta') c.append(kontaView());
+  else if(ui.view==='categories') c.append(categoriesView());
   else c.append(reportsView());
   save();
 }
@@ -894,47 +945,56 @@ function renderSidebar(){
 }
 function acctColor(t){return {checking:'#2f7de1',savings:'#0a7d6e',cash:'#1f9d57',credit:'#c0392b',tracking:'#8b5cf6'}[t]||'#888';}
 
-/* ---------- BUDGET VIEW ---------- */
+/* ---------- BUDGET VIEW (3-level tree, budget on any level) ---------- */
 function budgetView(){
   const wrap=document.createElement('div'); wrap.className='budget-wrap';
   const t=document.createElement('div'); t.className='btable';
   t.innerHTML=`<div class="brow-h"><div>${T('col_category')}</div><div class="num">${T('col_assigned')}</div><div class="num c-act">${T('col_activity')}</div><div class="num">${T('col_available')}</div></div>`;
-  state.groups.forEach(g=>{
-    const gEl=document.createElement('div'); gEl.className='cat-group'+(ui.collapsed[g.id]?' collapsed':'');
-    let gAsg=0,gAct=0,gAvl=0;
-    const rows=g.categories.map(c=>{
-      const a=assigned(c.id,ui.month), act=activity(c.id,ui.month), avl=available(c.id,ui.month);
-      gAsg+=a;gAct+=act;gAvl+=avl;
-      const ti=targetInfo(c,ui.month);
-      let cls='zero'; if(avl<0)cls='neg'; else if(ti.state==='under'&&avl>=0)cls='under'; else if(avl>0)cls='pos';
-      const bar = ti.state!=='none' ? `<div class="tgt-bar ${ti.state==='under'?'under':''}"><i style="width:${ti.pct}%"></i></div>` : '';
-      return `<div class="cat-row ${ui.selCat===c.id?'sel':''}" data-cat="${c.id}">
-        <div class="cat-name"><div class="nm">${c.name}</div>${bar}</div>
-        <div class="assigned-cell"><span class="val" data-assign="${c.id}">${fmt(a)}</span></div>
-        <div class="num activity-cell">${act?fmt(act):'—'}</div>
-        <div class="num"><span class="avail-pill ${cls}">${fmt(avl)}</span></div>
-      </div>`;
-    }).join('');
-    gEl.innerHTML=`<div class="cg-head" data-group="${g.id}">
-        <div class="nm"><span class="caret">▼</span>${g.name}</div>
-        <div class="num">${fmt(gAsg)}</div><div class="num c-act">${gAct?fmt(gAct):'—'}</div><div class="num">${fmt(gAvl)}</div>
-      </div>${rows}<button class="add-cat" data-addcat="${g.id}">${T('add_category')}</button>`;
-    t.append(gEl);
+  const m=ui.month;
+  const rowHtml=(node,level)=>{
+    const a=assigned(node.id,m), act=activity(node.id,m), avl=available(node.id,m);
+    const kids=nodeKids(node), hasKids=kids.length>0, coll=!!ui.collapsed[node.id];
+    const ti=targetInfo(node,m);
+    let cls='zero'; if(avl<0)cls='neg'; else if(ti.state==='under'&&avl>=0)cls='under'; else if(avl>0)cls='pos';
+    const bar = ti.state!=='none' ? `<div class="tgt-bar ${ti.state==='under'?'under':''}"><i style="width:${ti.pct}%"></i></div>` : '';
+    const branch = hasKids ? `<span class="branch-sum">${T('branch')}: ${fmt(rolled(node,m,assigned))} · ${fmt(rolled(node,m,available))}</span>` : '';
+    const caret = hasKids ? `<span class="caret ${coll?'c':''}" data-caret="${node.id}">▼</span>` : `<span class="caret-sp"></span>`;
+    return `<div class="cat-row lvl${level} ${hasKids?'is-parent':''} ${ui.selCat===node.id?'sel':''}" data-cat="${node.id}">
+      <div class="cat-name"><div class="nm">${caret}<span class="nm-txt">${node.name}</span>${branch}</div>${bar}</div>
+      <div class="assigned-cell"><span class="val" data-assign="${node.id}">${fmt(a)}</span></div>
+      <div class="num activity-cell">${act?fmt(act):'—'}</div>
+      <div class="num"><span class="avail-pill ${cls}">${fmt(avl)}</span></div>
+    </div>`;
+  };
+  state.groups.forEach(sec=>{
+    let html=rowHtml(sec,1);
+    if(!ui.collapsed[sec.id]){
+      (sec.categories||[]).forEach(cat=>{
+        html+=rowHtml(cat,2);
+        if(!ui.collapsed[cat.id]){
+          (cat.subs||[]).forEach(sub=>{ html+=rowHtml(sub,3); });
+          html+=`<button class="add-cat lvl3" data-addsub="${cat.id}">${T('add_subcategory')}</button>`;
+        }
+      });
+      html+=`<button class="add-cat lvl2" data-addcat="${sec.id}">${T('add_category')}</button>`;
+    }
+    const secEl=document.createElement('div'); secEl.className='cat-group'; secEl.innerHTML=html; t.append(secEl);
   });
   wrap.append(t);
   const foot=document.createElement('div'); foot.className='table-foot';
-  foot.innerHTML=`<button class="btn ghost" id="addGroupBtn">${T('add_group')}</button>`;
+  foot.innerHTML=`<button class="btn ghost" id="addSectionBtn">${T('add_section')}</button>`;
   wrap.append(foot);
 
   // events
-  wrap.querySelectorAll('.cg-head').forEach(h=>h.onclick=()=>{const id=h.dataset.group;ui.collapsed[id]=!ui.collapsed[id];render();});
   wrap.querySelectorAll('.cat-row').forEach(r=>r.onclick=e=>{
     if(e.target.closest('[data-assign]')) return;
+    if(e.target.closest('[data-caret]')){ const id=e.target.closest('[data-caret]').dataset.caret; ui.collapsed[id]=!ui.collapsed[id]; render(); return; }
     ui.selCat=r.dataset.cat; render();
   });
   wrap.querySelectorAll('[data-assign]').forEach(el=>el.onclick=e=>{e.stopPropagation();editAssign(el);});
   wrap.querySelectorAll('[data-addcat]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAddCategory(b.dataset.addcat);});
-  foot.querySelector('#addGroupBtn').onclick=openAddGroup;
+  wrap.querySelectorAll('[data-addsub]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAddSub(b.dataset.addsub);});
+  foot.querySelector('#addSectionBtn').onclick=openAddGroup;
   return wrap;
 }
 
@@ -991,7 +1051,7 @@ function inspectorView(){
           <select id="mvDir"><option value="to">${T('to_this_cat')}</option><option value="from">${T('from_this_cat')}</option></select></div>
       </div>
       <div class="field"><label>${T('other_category')}</label>
-        <select id="mvCat"><option value="__rta__">${T('rta_opt')}</option>${otherCats.map(x=>`<option value="${x.id}">${x.groupName} › ${x.name}</option>`).join('')}</select></div>
+        <select id="mvCat"><option value="__rta__">${T('rta_opt')}</option>${otherCats.map(x=>`<option value="${x.id}">${x.path}</option>`).join('')}</select></div>
       <button class="mini-btn ghost" id="doMove">${T('move')}</button>
     </div>
     <a class="link-btn" id="delCat">${T('delete_category')}</a>`;
@@ -1021,10 +1081,35 @@ function moveMoney(catId, otherId, amt, dir){
   if(dir==='to'){ add(catId,amt); add(otherId,-amt); }
   else { add(catId,-amt); add(otherId,amt); }
 }
-function deleteCategory(catId){
-  state.groups.forEach(g=>g.categories=g.categories.filter(c=>c.id!==catId));
-  state.transactions.forEach(t=>{if(t.categoryId===catId)t.categoryId=null;});
+// delete any node (section / category / subcategory) with everything inside it
+function deleteCategory(nodeId){
+  const node=catById(nodeId); if(!node) return;
+  const ids=new Set(); const collect=n=>{ ids.add(n.id); nodeKids(n).forEach(collect); }; collect(node);
+  state.groups=state.groups.filter(sec=>{
+    if(sec.id===nodeId) return false;
+    sec.categories=(sec.categories||[]).filter(cat=>{
+      if(cat.id===nodeId) return false;
+      cat.subs=(cat.subs||[]).filter(sub=>sub.id!==nodeId);
+      return true;
+    });
+    return true;
+  });
+  state.transactions.forEach(t=>{ if(ids.has(t.categoryId)) t.categoryId=null; });     // orphaned txns → uncategorized
+  for(const mm of Object.values(state.assignments)) ids.forEach(id=>{ delete mm[id]; });  // drop assignments
   ui.selCat=null; render();
+}
+function openAddSub(catId){
+  openModal(`<div class="modal"><div class="modal-h"><h3>${T('new_subcategory')}</h3><button class="x" data-close>×</button></div>
+    <div class="modal-b"><div class="field"><label>${T('subcategory_name')}</label><input id="subName" type="text"></div></div>
+    <div class="modal-f"><button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="subSave">${T('add')}</button></div></div>`);
+  modalHost.querySelector('#subName').focus();
+  modalHost.querySelector('#subSave').onclick=()=>{
+    const name=modalHost.querySelector('#subName').value.trim(); if(!name)return;
+    const cat=catById(catId); if(!cat){closeModal();return;}
+    if(!cat.subs) cat.subs=[];
+    cat.subs.push({id:uid('c'),name,target:null});
+    closeModal(); render();
+  };
 }
 
 /* ---------- ACCOUNTS / TRANSACTIONS ---------- */
@@ -1163,6 +1248,33 @@ function kontaView(){
   </div>`;
   return el;
 }
+/* ---------- CATEGORIES MANAGER ---------- */
+function categoriesView(){
+  const el=document.createElement('div'); el.style.maxWidth='760px'; el.style.margin='0 auto';
+  const rowHtml=(n,level)=>`<div class="cm-row lvl${level}">
+      <input class="cm-name" data-id="${n.id}" value="${(n.name||'').replace(/"/g,'&quot;')}">
+      <div class="cm-actions">
+        ${level<3?`<button class="cm-add" data-add="${n.id}" data-level="${level}" title="${level===1?T('add_category'):T('add_subcategory')}">＋</button>`:''}
+        <button class="cm-del" data-del="${n.id}" title="${T('delete')}">✕</button>
+      </div></div>`;
+  let tree='';
+  state.groups.forEach(sec=>{
+    tree+=rowHtml(sec,1);
+    (sec.categories||[]).forEach(cat=>{
+      tree+=rowHtml(cat,2);
+      (cat.subs||[]).forEach(sub=>{ tree+=rowHtml(sub,3); });
+    });
+  });
+  el.innerHTML=`<div class="rep-panel"><h3>${T('cat_manager')}</h3>
+    <div class="tgt-txt" style="margin-bottom:14px">${T('cat_hint')}</div>
+    <div id="catTree">${tree||`<div class="tgt-txt">—</div>`}</div>
+    <button class="btn ghost" id="addSecBtn" style="margin-top:14px">${T('add_section')}</button></div>`;
+  el.querySelectorAll('.cm-name').forEach(inp=>inp.onchange=()=>{ const n=catById(inp.dataset.id); if(n){ const v=inp.value.trim(); if(v){ n.name=v; save(); } else inp.value=n.name; } });
+  el.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{ (+b.dataset.level===1?openAddCategory:openAddSub)(b.dataset.add); });
+  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(confirm(T('del_node_confirm'))) deleteCategory(b.dataset.del); });
+  el.querySelector('#addSecBtn').onclick=openAddGroup;
+  return el;
+}
 function reportsView(){
   const el=document.createElement('div'); el.style.maxWidth='980px'; el.style.margin='0 auto';
   const m=ui.month; const {spendByCat}=monthStats(m);
@@ -1203,7 +1315,7 @@ function openAddTxn(){
         <div class="field"><label>${T('amount_zl')}</label><input id="txAmt" type="text" placeholder="0,00"></div>
       </div>
       <div class="field" id="txPayeeField"><label>${T('payee_note')}</label><input id="txPayee" type="text" placeholder="${T('payee_ph')}"></div>
-      <div class="field" id="txCatField"><label>${T('category')}</label><select id="txCat">${cats.map(c=>`<option value="${c.id}">${c.groupName} › ${c.name}</option>`).join('')}</select></div>
+      <div class="field" id="txCatField"><label>${T('category')}</label><select id="txCat">${cats.map(c=>`<option value="${c.id}">${c.path}</option>`).join('')}</select></div>
     </div>
     <div class="modal-f"><button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="txSave">${T('save')}</button></div></div>`);
   const $=s=>modalHost.querySelector(s);
@@ -1247,7 +1359,7 @@ function openEditTxn(id){
         <div class="field"><label>${T('amount_zl')}</label><input id="txAmt" type="text" value="${grosz(Math.abs(t.amount))}"></div>
       </div>
       <div class="field"><label>${T('payee_note')}</label><input id="txPayee" type="text" value="${(t.payee||'').replace(/"/g,'&quot;')}"></div>
-      <div class="field" id="txCatField"><label>${T('category')}</label><select id="txCat">${cats.map(c=>`<option value="${c.id}" ${t.categoryId===c.id?'selected':''}>${c.groupName} › ${c.name}</option>`).join('')}</select></div>
+      <div class="field" id="txCatField"><label>${T('category')}</label><select id="txCat">${cats.map(c=>`<option value="${c.id}" ${t.categoryId===c.id?'selected':''}>${c.path}</option>`).join('')}</select></div>
     </div>
     <div class="modal-f">
       <button class="mini-btn" id="txDel" style="background:none;color:var(--red);width:auto;margin:0 auto 0 0;padding:8px 2px">${T('delete')}</button>
