@@ -237,6 +237,20 @@
   .cm-row.drop-before{box-shadow:inset 0 2px 0 var(--brand);}
   .cm-row.drop-after{box-shadow:inset 0 -2px 0 var(--brand);}
   .cm-row.drop-into{background:var(--surface-2);box-shadow:inset 0 0 0 2px var(--brand);}
+  /* collapse carets + child count */
+  .cm-caret{flex:0 0 auto;width:16px;text-align:center;cursor:pointer;color:var(--ink-soft);font-size:.72rem;transition:transform .15s;user-select:none;}
+  .cm-caret.open{transform:rotate(90deg);}
+  .cm-caret-sp{flex:0 0 auto;width:16px;}
+  .cm-count{flex:0 0 auto;font-size:.66rem;color:var(--ink-soft);background:var(--surface-2);padding:1px 8px;border-radius:var(--r-pill);}
+  /* between-row hover insert (+) */
+  .cm-ins{position:relative;height:10px;cursor:pointer;}
+  .cm-ins::after{content:"";position:absolute;right:0;top:50%;height:2px;background:transparent;border-radius:2px;transform:translateY(-50%);transition:.12s;}
+  .cm-ins.addcat::after{left:22px;} .cm-ins.addsub::after{left:44px;}
+  .cm-ins:hover::after{background:var(--brand);opacity:.45;}
+  .cm-ins-btn{position:absolute;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:50%;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);font-size:1rem;line-height:1;display:flex;align-items:center;justify-content:center;opacity:0;transition:.12s;z-index:1;}
+  .cm-ins.addcat .cm-ins-btn{left:14px;} .cm-ins.addsub .cm-ins-btn{left:36px;}
+  .cm-ins:hover .cm-ins-btn{opacity:1;}
+  .cm-ins-btn:hover{background:var(--brand);color:#fff;border-color:var(--brand);}
   /* searchable category combobox */
   .cat-combo{position:relative;}
   .cc-input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm);outline:none;font-size:.95rem;}
@@ -591,7 +605,7 @@ const I18N = {
     del_node_confirm:'Delete this and everything inside it? Its transactions will become uncategorized.',
     branch:'branch', uncategorized:'Uncategorized', cat_hint:'Add, rename, delete and nest categories (3 levels). Assign budget on any level.',
     search_category:'Search category…', no_match:'No matches', pick_category:'Pick a category',
-    enable:'Enable', disable:'Disable', disabled_label:'disabled',
+    enable:'Enable', disable:'Disable', disabled_label:'disabled', expand_all:'Expand all', collapse_all:'Collapse all',
     cant_delete_txn:(n,d)=>`Can't delete — ${n} transaction${n===1?'':'s'} logged here${d?` (last on ${d})`:''}. Disable it instead.`,
     tab_spending:'Spending', tab_income:'Income', col_expected:'Expected', col_actual:'Actual', col_difference:'Difference', income_by_source:'Income by source'
   },
@@ -648,7 +662,7 @@ const I18N = {
     del_node_confirm:'Usunąć to i całą zawartość? Powiązane transakcje stracą kategorię.',
     branch:'gałąź', uncategorized:'Bez kategorii', cat_hint:'Dodawaj, zmieniaj i usuwaj kategorie (3 poziomy). Przypisuj budżet na dowolnym poziomie.',
     search_category:'Szukaj kategorii…', no_match:'Brak wyników', pick_category:'Wybierz kategorię',
-    enable:'Włącz', disable:'Wyłącz', disabled_label:'wyłączona',
+    enable:'Włącz', disable:'Wyłącz', disabled_label:'wyłączona', expand_all:'Rozwiń wszystko', collapse_all:'Zwiń wszystko',
     cant_delete_txn:(n,d)=>`Nie można usunąć — zapisano tu ${n} transakcj${n===1?'ę':'i'}${d?` (ostatnia ${d})`:''}. Zamiast tego wyłącz.`,
     tab_spending:'Wydatki', tab_income:'Przychody', col_expected:'Oczekiwane', col_actual:'Rzeczywiste', col_difference:'Różnica', income_by_source:'Przychody wg źródła'
   }
@@ -886,6 +900,19 @@ function allCats(root){ const o=[]; const walk=root!==undefined?(cb=>eachNodeIn(
 function catById(id){ let f=null; eachNode(n=>{ if(n.id===id) f=n; }); return f; }     // finds archived too (for display)
 function nodePathById(id){ let p=''; eachNode((n,pp)=>{ if(n.id===id) p=pp?pp+' › '+n.name:n.name; }); return p; }
 function rolled(n,m,fn){ let s=fn(n.id,m); nodeKids(n).forEach(k=>{ if(!k.archived) s+=rolled(k,m,fn); }); return s; }   // own + active descendants
+// subtree height: 0 = leaf, 1 = has leaf children, 2 = section→categories→subs
+function nodeHeight(n){ const k=nodeKids(n); return k.length ? 1+Math.max(...k.map(nodeHeight)) : 0; }
+// is `id` anywhere inside `ancestorId`'s subtree?
+function isDescendant(ancestorId, id){ const a=catById(ancestorId); if(!a) return false; let f=false; const w=n=>nodeKids(n).forEach(k=>{ if(k.id===id) f=true; w(k); }); w(a); return f; }
+// after a cross-level move, rename each node's child-array key to match its new absolute level
+function normalizeContainers(node, level){
+  const kids=node.categories||node.subs||null;
+  delete node.categories; delete node.subs;
+  if(kids && kids.length){
+    node[level===1?'categories':'subs']=kids;   // L1 holds categories, L2/L3 hold subs
+    kids.forEach(k=>normalizeContainers(k, level+1));
+  }
+}
 
 // activity for a category within a month (sum of txn amounts, spending negative)
 function activity(catId, mKey){
@@ -1282,7 +1309,7 @@ function deleteCategory(nodeId){
   for(const mm of Object.values(state.expected||{})) ids.forEach(id=>{ delete mm[id]; }); // drop expected income
   ui.selCat=null; render();
 }
-function openAddSub(catId){
+function openAddSub(catId, index){
   openModal(`<div class="modal"><div class="modal-h"><h3>${T('new_subcategory')}</h3><button class="x" data-close>×</button></div>
     <div class="modal-b"><div class="field"><label>${T('subcategory_name')}</label><input id="subName" type="text"></div></div>
     <div class="modal-f"><button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="subSave">${T('add')}</button></div></div>`);
@@ -1290,8 +1317,9 @@ function openAddSub(catId){
   modalHost.querySelector('#subSave').onclick=()=>{
     const name=modalHost.querySelector('#subName').value.trim(); if(!name)return;
     const cat=catById(catId); if(!cat){closeModal();return;}
-    if(!cat.subs) cat.subs=[];
-    cat.subs.push({id:uid('c'),name,target:null});
+    const arr=(cat.subs=cat.subs||[]); const node={id:uid('c'),name,target:null};
+    (index==null||index<0||index>arr.length) ? arr.push(node) : arr.splice(index,0,node);
+    if(ui.catExpanded) ui.catExpanded[catId]=true;
     closeModal(); render();
   };
 }
@@ -1309,26 +1337,34 @@ function catLoc(id){
   }
   return null;
 }
-// move a node. mode: 'before'|'after' (same-level reorder relative to target) or 'into' (append as child of a one-level-higher target)
+// move a node. mode: 'into' (become a child of target) or 'before'/'after' (become a sibling of target).
+// Supports promotion/demotion across levels; blocks moves that would exceed the 3-level max depth.
 function moveCatNode(dragId,targetId,mode){
   if(dragId===targetId) return;
   const from=catLoc(dragId); if(!from) return;
   const tloc=catLoc(targetId); if(!tloc || tloc.root!==from.root) return;   // stay within the same tree
+  if(isDescendant(dragId, targetId)) return;                                 // can't drop into own subtree
   const node=from.arr[from.idx];
-  let destArr, destIdx;
+  const h=nodeHeight(node);
+  let destArr, destIdx, destLevel, expandId;
   if(mode==='into'){
-    const tgt=catById(targetId); if(!tgt) return;
-    if(from.level===2) destArr=(tgt.categories=tgt.categories||[]);
-    else if(from.level===3) destArr=(tgt.subs=tgt.subs||[]);
-    else return;
-    destIdx=destArr.length;
-  } else {
-    if(tloc.level!==from.level) return;
+    if(tloc.level>=3) return;                       // level-3 nodes can't hold children
+    destLevel=tloc.level+1;
+    if(destLevel+h>3) return;                        // would exceed max depth
+    const tgt=tloc.arr[tloc.idx];
+    destArr = tgt[destLevel===2?'categories':'subs'] = tgt[destLevel===2?'categories':'subs'] || [];
+    destIdx = destArr.length; expandId=targetId;
+  } else {                                           // sibling of target
+    destLevel=tloc.level;
+    if(destLevel+h>3) return;
     destArr=tloc.arr; destIdx=tloc.idx + (mode==='after'?1:0);
+    expandId = tloc.parent ? tloc.parent.id : null;
   }
   from.arr.splice(from.idx,1);
   if(from.arr===destArr && from.idx<destIdx) destIdx--;
   destArr.splice(destIdx,0,node);
+  normalizeContainers(node, destLevel);              // fix child-array keys for the new level
+  if(expandId){ if(!ui.catExpanded) ui.catExpanded={}; ui.catExpanded[expandId]=true; }  // reveal the moved node
   save(); render();
 }
 
@@ -1473,28 +1509,43 @@ function kontaView(){
 /* ---------- CATEGORIES MANAGER ---------- */
 function categoriesView(){
   const el=document.createElement('div'); el.style.maxWidth='760px'; el.style.margin='0 auto';
+  const exp = ui.catExpanded || (ui.catExpanded={});
   const rowHtml=(n,level)=>{
     const info=catTxnInfo(n.id), hasTx=info.count>0;
+    const canHold=level<3, open=!!exp[n.id];
+    const kidN=canHold?nodeKids(n).length:0;
+    const caret = canHold ? `<span class="cm-caret ${open?'open':''}" data-caret="${n.id}">▸</span>` : `<span class="cm-caret-sp"></span>`;
+    const count = (canHold && !open && kidN) ? `<span class="cm-count">${kidN}</span>` : '';
     return `<div class="cm-row lvl${level} ${n.archived?'archived':''}" data-id="${n.id}" data-level="${level}">
       <span class="cm-grip" draggable="true">⠿</span>
+      ${caret}
       <input class="cm-name" data-id="${n.id}" value="${(n.name||'').replace(/"/g,'&quot;')}">
+      ${count}
       ${n.archived?`<span class="cm-tag">${T('disabled_label')}</span>`:''}
       <div class="cm-actions">
         <button class="cm-toggle ${n.archived?'':'on'}" data-arch="${n.id}" role="switch" aria-checked="${!n.archived}" title="${n.archived?T('enable'):T('disable')}"><span class="knob"></span></button>
         <button class="cm-del" data-del="${n.id}" ${hasTx?'disabled':''} title="${hasTx?T('cant_delete_txn',info.count,info.lastDate):T('delete')}">✕</button>
       </div></div>`;
   };
+  const insHtml=(pid,level,index)=>`<div class="cm-ins ${level===1?'addcat':'addsub'}" data-add="${pid}" data-level="${level}" data-index="${index}"><button class="cm-ins-btn" title="${level===1?T('add_category'):T('add_subcategory')}">+</button></div>`;
   const kind=ui.catKind==='income'?'income':'expense';
   const root=rootForKind(kind);
   let tree='';
   root.forEach(sec=>{
     tree+=rowHtml(sec,1);
-    (sec.categories||[]).forEach(cat=>{
-      tree+=rowHtml(cat,2);
-      (cat.subs||[]).forEach(sub=>{ tree+=rowHtml(sub,3); });
-      tree+=`<button class="cm-addchild" style="padding-left:44px" data-add="${cat.id}" data-level="2">${T('add_subcategory')}</button>`;
-    });
-    tree+=`<button class="cm-addchild" style="padding-left:22px" data-add="${sec.id}" data-level="1">${T('add_category')}</button>`;
+    if(exp[sec.id]){
+      const cats=sec.categories||[];
+      tree+=insHtml(sec.id,1,0);
+      cats.forEach((cat,ci)=>{
+        tree+=rowHtml(cat,2);
+        if(exp[cat.id]){
+          const subs=cat.subs||[];
+          tree+=insHtml(cat.id,2,0);
+          subs.forEach((sub,si)=>{ tree+=rowHtml(sub,3); tree+=insHtml(cat.id,2,si+1); });
+        }
+        tree+=insHtml(sec.id,1,ci+1);
+      });
+    }
   });
   el.innerHTML=`<div class="rep-panel"><h3>${T('cat_manager')}</h3>
     <div class="seg-toggle" style="margin-bottom:14px">
@@ -1502,33 +1553,49 @@ function categoriesView(){
       <button class="${kind==='income'?'on':''}" data-ckind="income">${T('tab_income')}</button></div>
     <div class="tgt-txt" style="margin-bottom:14px">${T('cat_hint')}</div>
     <div id="catTree">${tree||`<div class="tgt-txt">—</div>`}</div>
-    <button class="btn ghost" id="addSecBtn" style="margin-top:14px">${T('add_section')}</button></div>`;
+    <div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap">
+      <button class="btn ghost" id="addSecBtn">${T('add_section')}</button>
+      <button class="btn ghost" id="expandAllBtn" style="opacity:.75">${allExpanded(root)?T('collapse_all'):T('expand_all')}</button>
+      <button class="btn ghost" id="seedSnapBtn" title="Temporary dev tool" style="margin-left:auto;opacity:.75">⚙ Save as seed</button>
+    </div></div>`;
   el.querySelectorAll('[data-ckind]').forEach(b=>b.onclick=()=>{ ui.catKind=b.dataset.ckind; render(); });
+  el.querySelector('#seedSnapBtn').onclick=openSeedExport;
+  el.querySelector('#expandAllBtn').onclick=()=>{ toggleExpandAll(root); render(); };
+  el.querySelectorAll('[data-caret]').forEach(c=>c.onclick=()=>{ ui.catExpanded[c.dataset.caret]=!ui.catExpanded[c.dataset.caret]; render(); });
+  el.querySelectorAll('.cm-ins-btn').forEach(b=>b.onclick=()=>{ const s=b.closest('.cm-ins'); const pid=s.dataset.add, lvl=+s.dataset.level, idx=+s.dataset.index; ui.catExpanded[pid]=true; (lvl===1?openAddCategory:openAddSub)(pid, idx); });
   el.querySelectorAll('.cm-name').forEach(inp=>inp.onchange=()=>{ const n=catById(inp.dataset.id); if(n){ const v=inp.value.trim(); if(v){ n.name=v; save(); } else inp.value=n.name; } });
-  el.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{ (+b.dataset.level===1?openAddCategory:openAddSub)(b.dataset.add); });
   el.querySelectorAll('[data-arch]').forEach(b=>b.onclick=()=>toggleArchive(b.dataset.arch));
   el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(b.disabled) return; if(confirm(T('del_node_confirm'))) deleteCategory(b.dataset.del); });
   el.querySelector('#addSecBtn').onclick=()=>openAddGroup(kind);
-  // drag & drop: grip starts the drag, the row is the drop target
+  // drag & drop: grip starts the drag, the row is the drop target.
+  // vertical thirds → before / into / after; supports promotion/demotion across levels (depth-checked)
   const clearDrop=()=>el.querySelectorAll('.cm-row').forEach(r=>r.classList.remove('drop-before','drop-after','drop-into'));
   el.querySelectorAll('.cm-row').forEach(row=>{
     const grip=row.querySelector('.cm-grip');
     grip.ondragstart=e=>{ dragCat={id:row.dataset.id, level:+row.dataset.level}; e.dataTransfer.effectAllowed='move'; row.classList.add('dragging'); };
     grip.ondragend=()=>{ dragCat=null; el.querySelectorAll('.cm-row').forEach(r=>r.classList.remove('dragging')); clearDrop(); };
     row.ondragover=e=>{
-      if(!dragCat) return;
-      const dl=dragCat.level, tl=+row.dataset.level; let mode=null;
-      if(row.dataset.id!==dragCat.id){
-        if(tl===dl){ const rc=row.getBoundingClientRect(); mode=(e.clientY<rc.top+rc.height/2)?'before':'after'; }
-        else if(tl===dl-1){ mode='into'; }
-      }
-      row._dropmode=mode; clearDrop();
-      if(mode){ e.preventDefault(); row.classList.add('drop-'+mode); }
+      if(!dragCat){ return; }
+      row._dropmode=null; clearDrop();
+      if(row.dataset.id===dragCat.id || isDescendant(dragCat.id, row.dataset.id)) return;
+      const tl=+row.dataset.level, rc=row.getBoundingClientRect(), rel=(e.clientY-rc.top)/rc.height;
+      let mode = (tl<3 && rel>0.30 && rel<0.70) ? 'into' : (rel<0.5?'before':'after');
+      const node=catById(dragCat.id), h=node?nodeHeight(node):0;
+      const destLevel = mode==='into' ? tl+1 : tl;
+      if(destLevel<1 || destLevel+h>3 || (mode==='into'&&tl>=3)) return;   // invalid drop → no highlight
+      row._dropmode=mode;
+      e.preventDefault(); row.classList.add('drop-'+mode);
     };
     row.ondragleave=()=>row.classList.remove('drop-before','drop-after','drop-into');
     row.ondrop=e=>{ e.preventDefault(); const mode=row._dropmode; clearDrop(); if(mode && dragCat) moveCatNode(dragCat.id, row.dataset.id, mode); };
   });
   return el;
+}
+// expand/collapse helpers for the manager (only container nodes matter)
+function allExpanded(root){ let all=true; (root||[]).forEach(sec=>{ if(!ui.catExpanded[sec.id]) all=false; (sec.categories||[]).forEach(cat=>{ if((cat.subs||[]).length && !ui.catExpanded[cat.id]) all=false; }); }); return all; }
+function toggleExpandAll(root){
+  const target=!allExpanded(root); if(!ui.catExpanded) ui.catExpanded={};
+  (root||[]).forEach(sec=>{ ui.catExpanded[sec.id]=target; (sec.categories||[]).forEach(cat=>{ ui.catExpanded[cat.id]=target; }); });
 }
 function reportsView(){
   const el=document.createElement('div'); el.style.maxWidth='980px'; el.style.margin='0 auto';
@@ -1876,14 +1943,17 @@ function openEditAccount(id){
     closeModal(); toast(T('account_deleted')); render();
   };
 }
-function openAddCategory(groupId){
+function openAddCategory(groupId, index){
   openModal(`<div class="modal"><div class="modal-h"><h3>${T('new_category')}</h3><button class="x" data-close>×</button></div>
     <div class="modal-b"><div class="field"><label>${T('category_name')}</label><input id="catName" type="text" placeholder="${T('category_ph')}"></div></div>
     <div class="modal-f"><button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="catSave">${T('add')}</button></div></div>`);
   modalHost.querySelector('#catName').focus();
   modalHost.querySelector('#catSave').onclick=()=>{
     const name=modalHost.querySelector('#catName').value.trim(); if(!name){return;}
-    const g=catById(groupId); if(!g){closeModal();return;} (g.categories=g.categories||[]).push({id:uid('c'),name,target:null});
+    const g=catById(groupId); if(!g){closeModal();return;}
+    const arr=(g.categories=g.categories||[]); const node={id:uid('c'),name,target:null};
+    (index==null||index<0||index>arr.length) ? arr.push(node) : arr.splice(index,0,node);
+    if(ui.catExpanded) ui.catExpanded[groupId]=true;
     closeModal(); render();
   };
 }
@@ -1998,6 +2068,43 @@ function exportJSON(){
   const blob=new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='mybalance-backup.json';
   a.click(); URL.revokeObjectURL(a.href); toast(T('exported'));
+}
+/* ---- TEMPORARY dev tool: snapshot the current category trees as seed data ---- */
+function cleanSeedNode(n){
+  const o={name:n.name};
+  if(n.target) o.target=n.target;
+  if(n.archived) o.archived=true;
+  const kids=n.categories||n.subs;
+  if(kids&&kids.length){ o[n.categories?'categories':'subs']=kids.map(cleanSeedNode); }
+  return o;
+}
+function dumpSeedCategories(){
+  return JSON.stringify({
+    groups:(state.groups||[]).map(cleanSeedNode),
+    incomeGroups:(state.incomeGroups||[]).map(cleanSeedNode)
+  }, null, 2);
+}
+function openSeedExport(){
+  const json=dumpSeedCategories();
+  openModal(`<div class="modal"><div class="modal-h"><h3>Save current categories as seed</h3><button class="x" data-close>×</button></div>
+    <div class="modal-b">
+      <div class="tgt-txt" style="margin-bottom:10px">Snapshot of your expense + income category trees (names, nesting, targets). Copy or download it and send it over — it gets baked into the app's starting data.</div>
+      <textarea id="seedOut" readonly style="width:100%;height:220px;font-family:var(--font-mono,monospace);font-size:.78rem;padding:10px;border-radius:var(--r-sm);border:1px solid var(--border);resize:vertical;white-space:pre;">${json.replace(/</g,'&lt;')}</textarea>
+    </div>
+    <div class="modal-f">
+      <button class="btn ghost" id="seedDl" style="margin-right:auto">Download .json</button>
+      <button class="btn ghost" data-close>Close</button>
+      <button class="btn" id="seedCopy">Copy</button></div></div>`);
+  const ta=modalHost.querySelector('#seedOut');
+  modalHost.querySelector('#seedCopy').onclick=async()=>{
+    try{ await navigator.clipboard.writeText(json); }catch(e){ ta.focus(); ta.select(); document.execCommand('copy'); }
+    toast('Copied — send it over');
+  };
+  modalHost.querySelector('#seedDl').onclick=()=>{
+    const blob=new Blob([json],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='mybalance-seed-categories.json';
+    a.click(); URL.revokeObjectURL(a.href);
+  };
 }
 function importJSON(file){
   const r=new FileReader();
