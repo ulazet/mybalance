@@ -208,27 +208,28 @@
   .branch-sum{font-size:.68rem;color:var(--ink-soft);font-weight:500;margin-left:6px;white-space:nowrap;flex:0 0 auto;}
   .add-cat.lvl2{padding-left:22px;}
   .add-cat.lvl3{padding-left:44px;}
-  /* categories manager */
+  /* categories manager — Notes-style: static name, hover grip + ⋯ menu, drag between levels */
   /* icons (grip/caret) stay left-aligned across all levels; hierarchy comes from name font + a small name indent */
-  .cm-row{display:flex;align-items:center;gap:4px;padding:4px 0;border-bottom:1px solid var(--line);}
-  .cm-row.lvl1{margin-top:8px;}
-  .cm-grip{cursor:grab;color:var(--ink-soft);opacity:.4;font-size:.72rem;flex:0 0 auto;user-select:none;padding:0 1px;}
+  .cm-row{display:flex;align-items:center;gap:4px;padding:5px 0;border-bottom:1px solid var(--line);}
+  .cm-row.lvl1{margin-top:2px;}
+  .cm-root{border-bottom:1px solid var(--line);margin-bottom:2px;}
+  .cm-grip{cursor:grab;color:var(--ink-soft);opacity:0;font-size:.72rem;flex:0 0 auto;user-select:none;padding:0 1px;transition:opacity .12s;}
+  .cm-row:hover .cm-grip{opacity:.45;}
   .cm-grip:active{cursor:grabbing;}
-  .cm-name{flex:1;border:1px solid transparent;border-radius:var(--r-sm);padding:6px 8px;outline:none;background:transparent;font-size:.9rem;min-width:0;}
-  .cm-row.lvl1 .cm-name{font-weight:700;}
-  .cm-row.lvl2 .cm-name{font-weight:600;margin-left:12px;}
-  .cm-row.lvl3 .cm-name{font-size:.84rem;color:var(--ink-soft);margin-left:24px;}
-  .cm-name:hover{border-color:var(--line);background:var(--surface);}
-  .cm-name:focus{border-color:var(--accent);background:var(--surface);}
-  .cm-actions{display:flex;gap:4px;flex:0 0 auto;}
+  .cm-name{flex:1 1 auto;padding:5px 8px;font-size:.9rem;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default;}
+  .cm-name-input{flex:1 1 auto;border:1px solid var(--accent);border-radius:var(--r-sm);padding:5px 8px;outline:none;background:var(--surface);font-size:.9rem;min-width:0;}
+  .cm-row.lvl0 .cm-name{font-weight:800;font-size:.98rem;}
+  .cm-row.lvl1 .cm-name{font-weight:700;margin-left:12px;}
+  .cm-row.lvl2 .cm-name{font-weight:600;margin-left:24px;}
+  .cm-row.lvl3 .cm-name{font-size:.84rem;color:var(--ink-soft);margin-left:36px;}
+  .cm-actions{display:flex;gap:4px;flex:0 0 auto;align-items:center;}
   .cm-actions button{width:30px;height:30px;border-radius:var(--r-sm);color:var(--ink-soft);font-size:1rem;}
-  .cm-del:hover{background:var(--red-bg);color:var(--red);}
-  /* per-row "add child" — appears on row hover, adds one level down (section→category, category→subcategory) */
-  .cm-add{font-size:1.15rem!important;line-height:1;opacity:0;transition:opacity .12s;}
-  .cm-row:hover .cm-add, .cm-add:focus-visible{opacity:1;}
-  .cm-add:hover{background:var(--surface-2);color:var(--brand);}
-  .cm-del:disabled{opacity:.28;cursor:not-allowed;}
-  .cm-del:disabled:hover{background:none;color:var(--ink-soft);}
+  /* ⋯ row-actions trigger — hover reveal (always shown on the root row for discoverability) */
+  .cm-menu-btn{opacity:0;transition:opacity .12s;font-size:1.15rem;letter-spacing:1px;line-height:1;}
+  .cm-row:hover .cm-menu-btn{opacity:1;}
+  .cm-root .cm-menu-btn{opacity:.7;}
+  .cm-root:hover .cm-menu-btn{opacity:1;}
+  .cm-menu-btn:hover{background:var(--surface-2);color:var(--ink);}
   .cm-actions .cm-toggle{width:34px;height:20px;border-radius:999px;background:var(--line);position:relative;padding:0;flex:0 0 auto;transition:.15s;}
   .cm-actions .cm-toggle.on{background:var(--brand);}
   .cm-toggle .knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:var(--sh-1);transition:.15s;}
@@ -245,16 +246,15 @@
   .cm-caret.open{transform:rotate(90deg);}
   .cm-caret-sp{flex:0 0 auto;width:14px;}
   .cm-count{flex:0 0 auto;font-size:.66rem;color:var(--ink-soft);background:var(--surface-2);padding:1px 8px;border-radius:var(--r-pill);}
-  /* between-row hover insert (+) */
-  .cm-ins{position:relative;height:10px;cursor:pointer;}
-  /* line + button sit ON the row divider (strip's top edge), not centered in the gap */
-  .cm-ins::after{content:"";position:absolute;right:0;top:0;height:2px;background:transparent;border-radius:2px;transform:translateY(-50%);transition:.12s;}
-  .cm-ins.addsec::after{left:0;} .cm-ins.addcat::after{left:32px;} .cm-ins.addsub::after{left:44px;}
-  .cm-ins:hover::after{background:var(--brand);opacity:.45;}
-  .cm-ins-btn{position:absolute;top:0;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);font-size:.95rem;line-height:1;display:flex;align-items:center;justify-content:center;opacity:0;transition:.12s;z-index:2;}
-  .cm-ins.addsec .cm-ins-btn{left:-2px;} .cm-ins.addcat .cm-ins-btn{left:24px;} .cm-ins.addsub .cm-ins-btn{left:36px;}
-  .cm-ins:hover .cm-ins-btn{opacity:1;}
-  .cm-ins-btn:hover{background:var(--brand);color:#fff;border-color:var(--brand);}
+  /* row-actions dropdown menu (Notes-style) */
+  .cm-menu{position:fixed;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--sh-3,0 8px 28px rgba(0,0,0,.16));padding:4px;min-width:172px;z-index:60;}
+  .cm-menu button{display:block;width:100%;text-align:left;padding:8px 12px;border-radius:var(--r-sm);font-size:.86rem;color:var(--ink);}
+  .cm-menu button:hover{background:var(--surface-2);}
+  .cm-menu button.danger{color:var(--red);}
+  .cm-menu button.danger:hover{background:var(--red-bg);}
+  .cm-menu button:disabled{opacity:.4;cursor:not-allowed;}
+  .cm-menu button:disabled:hover{background:none;}
+  .cm-menu .sep{height:1px;background:var(--line);margin:4px 6px;}
   /* manager action toolbar — sticky at top so it stays reachable in a long list */
   .cm-toolbar{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
     background:var(--surface);padding:10px 0;margin-bottom:6px;border-bottom:1px solid var(--line);}
@@ -613,6 +613,7 @@ const I18N = {
     branch:'branch', uncategorized:'Uncategorized', cat_hint:'Add, rename, delete and nest categories (3 levels). Assign budget on any level.',
     search_category:'Search category…', no_match:'No matches', pick_category:'Pick a category',
     enable:'Enable', disable:'Disable', disabled_label:'disabled', expand_all:'Expand all', collapse_all:'Collapse all',
+    cat_root:'Categories', add_group:'Add Group', add_cat_full:'Add Category', add_sub_full:'Add Subcategory', actions:'Actions',
     cant_delete_txn:(n,d)=>`Can't delete — ${n} transaction${n===1?'':'s'} logged here${d?` (last on ${d})`:''}. Disable it instead.`,
     tab_spending:'Spending', tab_income:'Income', col_expected:'Expected', col_actual:'Actual', col_difference:'Difference', income_by_source:'Income by source'
   },
@@ -670,6 +671,7 @@ const I18N = {
     branch:'gałąź', uncategorized:'Bez kategorii', cat_hint:'Dodawaj, zmieniaj i usuwaj kategorie (3 poziomy). Przypisuj budżet na dowolnym poziomie.',
     search_category:'Szukaj kategorii…', no_match:'Brak wyników', pick_category:'Wybierz kategorię',
     enable:'Włącz', disable:'Wyłącz', disabled_label:'wyłączona', expand_all:'Rozwiń wszystko', collapse_all:'Zwiń wszystko',
+    cat_root:'Kategorie', add_group:'Dodaj grupę', add_cat_full:'Dodaj kategorię', add_sub_full:'Dodaj podkategorię', actions:'Akcje',
     cant_delete_txn:(n,d)=>`Nie można usunąć — zapisano tu ${n} transakcj${n===1?'ę':'i'}${d?` (ostatnia ${d})`:''}. Zamiast tego wyłącz.`,
     tab_spending:'Wydatki', tab_income:'Przychody', col_expected:'Oczekiwane', col_actual:'Rzeczywiste', col_difference:'Różnica', income_by_source:'Przychody wg źródła'
   }
@@ -1518,69 +1520,67 @@ function categoriesView(){
   const el=document.createElement('div'); el.style.maxWidth='760px'; el.style.margin='0 auto';
   const exp = ui.catExpanded || (ui.catExpanded={});
   const rowHtml=(n,level)=>{
-    const info=catTxnInfo(n.id), hasTx=info.count>0;
     const canHold=level<3, open=!!exp[n.id];
     const kidN=canHold?nodeKids(n).length:0;
     // caret only when there's actually something underneath; otherwise a spacer keeps names aligned
     const caret = (canHold && kidN) ? `<span class="cm-caret ${open?'open':''}" data-caret="${n.id}">▸</span>` : `<span class="cm-caret-sp"></span>`;
     const count = (canHold && !open && kidN) ? `<span class="cm-count">${kidN}</span>` : '';
-    const addBtn = canHold ? `<button class="cm-add" data-addchild="${n.id}" data-level="${level}" title="${level===1?T('add_category'):T('add_subcategory')}">＋</button>` : '';
     return `<div class="cm-row lvl${level} ${n.archived?'archived':''}" data-id="${n.id}" data-level="${level}">
       <span class="cm-grip" draggable="true">⠿</span>
       ${caret}
-      <input class="cm-name" data-id="${n.id}" value="${(n.name||'').replace(/"/g,'&quot;')}">
+      <span class="cm-name" data-id="${n.id}">${escapeHtml(n.name||'')}</span>
       ${count}
       ${n.archived?`<span class="cm-tag">${T('disabled_label')}</span>`:''}
       <div class="cm-actions">
-        ${addBtn}
+        <button class="cm-menu-btn" data-menu="${n.id}" data-level="${level}" title="${T('actions')}">⋯</button>
         <button class="cm-toggle ${n.archived?'':'on'}" data-arch="${n.id}" role="switch" aria-checked="${!n.archived}" title="${n.archived?T('enable'):T('disable')}"><span class="knob"></span></button>
-        <button class="cm-del" data-del="${n.id}" ${hasTx?'disabled':''} title="${hasTx?T('cant_delete_txn',info.count,info.lastDate):T('delete')}">✕</button>
       </div></div>`;
   };
-  const insSec=index=>`<div class="cm-ins addsec" data-level="0" data-index="${index}"><button class="cm-ins-btn" title="${T('add_section')}">+</button></div>`;
   const kind=ui.catKind==='income'?'income':'expense';
   const root=rootForKind(kind);
-  let tree='';
-  tree+=insSec(0);                                  // add a section above the first
-  root.forEach((sec,si)=>{
-    tree+=rowHtml(sec,1);
-    if(exp[sec.id]){
-      const cats=sec.categories||[];
-      cats.forEach((cat,ci)=>{
+  const rootOpen = !ui.catRootCollapsed;
+  // synthetic "Categories" parent row — encloses all Groups, can't be dragged/disabled, its only action is Add Group
+  let tree=`<div class="cm-row lvl0 cm-root">
+      <span class="cm-caret ${rootOpen?'open':''}" data-rootcaret="1">▸</span>
+      <span class="cm-name">${T('cat_root')}</span>
+      ${(!rootOpen && root.length)?`<span class="cm-count">${root.length}</span>`:''}
+      <div class="cm-actions"><button class="cm-menu-btn" data-menu="root" title="${T('actions')}">⋯</button></div>
+    </div>`;
+  if(rootOpen){
+    root.forEach(sec=>{
+      tree+=rowHtml(sec,1);
+      if(exp[sec.id]) (sec.categories||[]).forEach(cat=>{
         tree+=rowHtml(cat,2);
-        if(exp[cat.id]){
-          const subs=cat.subs||[];
-          subs.forEach(sub=>{ tree+=rowHtml(sub,3); });
-        }
+        if(exp[cat.id]) (cat.subs||[]).forEach(sub=>{ tree+=rowHtml(sub,3); });
       });
-    }
-    tree+=insSec(si+1);                             // add a section after this one
-  });
+    });
+  }
   el.innerHTML=`<div class="rep-panel"><h3>${T('cat_manager')}</h3>
     <div class="seg-toggle" style="margin-bottom:14px">
       <button class="${kind==='expense'?'on':''}" data-ckind="expense">${T('tab_spending')}</button>
       <button class="${kind==='income'?'on':''}" data-ckind="income">${T('tab_income')}</button></div>
     <div class="tgt-txt" style="margin-bottom:10px">${T('cat_hint')}</div>
     <div class="cm-toolbar">
-      <button class="btn ghost" id="addSecBtn">${T('add_section')}</button>
       <button class="btn ghost" id="expandAllBtn" style="opacity:.75">${allExpanded(root)?T('collapse_all'):T('expand_all')}</button>
       <button class="btn ghost" id="seedSnapBtn" title="Temporary dev tool" style="margin-left:auto;opacity:.75">⚙ Save as seed</button>
     </div>
-    <div id="catTree">${tree||`<div class="tgt-txt">—</div>`}</div></div>`;
-  el.querySelectorAll('[data-ckind]').forEach(b=>b.onclick=()=>{ ui.catKind=b.dataset.ckind; render(); });
+    <div id="catTree">${tree}</div></div>`;
+  el.querySelectorAll('[data-ckind]').forEach(b=>b.onclick=()=>{ ui.catKind=b.dataset.ckind; closeCatMenu(); render(); });
   el.querySelector('#seedSnapBtn').onclick=openSeedExport;
   el.querySelector('#expandAllBtn').onclick=()=>{ toggleExpandAll(root); render(); };
+  el.querySelector('[data-rootcaret]').onclick=()=>{ ui.catRootCollapsed=!ui.catRootCollapsed; render(); };
   el.querySelectorAll('[data-caret]').forEach(c=>c.onclick=()=>{ ui.catExpanded[c.dataset.caret]=!ui.catExpanded[c.dataset.caret]; render(); });
-  el.querySelectorAll('.cm-ins-btn').forEach(b=>b.onclick=()=>{ const s=b.closest('.cm-ins'); const idx=+s.dataset.index; openAddGroup(kind, idx); });  // inline add a section
-  el.querySelectorAll('[data-addchild]').forEach(b=>b.onclick=()=>{ const id=b.dataset.addchild, lvl=+b.dataset.level; ui.catExpanded[id]=true; (lvl===1?openAddCategory:openAddSub)(id); });
-  el.querySelectorAll('.cm-name').forEach(inp=>inp.onchange=()=>{ const n=catById(inp.dataset.id); if(n){ const v=inp.value.trim(); if(v){ n.name=v; save(); } else inp.value=n.name; } });
   el.querySelectorAll('[data-arch]').forEach(b=>b.onclick=()=>toggleArchive(b.dataset.arch));
-  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(b.disabled) return; if(confirm(T('del_node_confirm'))) deleteCategory(b.dataset.del); });
-  el.querySelector('#addSecBtn').onclick=()=>openAddGroup(kind);
-  // drag & drop: grip starts the drag, the row is the drop target.
+  el.querySelectorAll('[data-menu]').forEach(b=>b.onclick=e=>{ e.stopPropagation();
+    const id=b.dataset.menu;
+    if(id==='root') openCatMenu(b,{isRoot:true,kind});
+    else openCatMenu(b,{id,level:+b.dataset.level,kind});
+  });
+  el.querySelectorAll('.cm-name[data-id]').forEach(sp=>sp.ondblclick=()=>startRename(sp.dataset.id));
+  // drag & drop: grip starts the drag, the row is the drop target (root row excluded).
   // vertical thirds → before / into / after; supports promotion/demotion across levels (depth-checked)
   const clearDrop=()=>el.querySelectorAll('.cm-row').forEach(r=>r.classList.remove('drop-before','drop-after','drop-into'));
-  el.querySelectorAll('.cm-row').forEach(row=>{
+  el.querySelectorAll('.cm-row[data-id]').forEach(row=>{
     const grip=row.querySelector('.cm-grip');
     grip.ondragstart=e=>{ dragCat={id:row.dataset.id, level:+row.dataset.level}; e.dataTransfer.effectAllowed='move'; row.classList.add('dragging'); };
     grip.ondragend=()=>{ dragCat=null; el.querySelectorAll('.cm-row').forEach(r=>r.classList.remove('dragging')); clearDrop(); };
@@ -1600,6 +1600,56 @@ function categoriesView(){
     row.ondrop=e=>{ e.preventDefault(); const mode=row._dropmode; clearDrop(); if(mode && dragCat) moveCatNode(dragCat.id, row.dataset.id, mode); };
   });
   return el;
+}
+function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// inline rename: swap the static name for an input
+function startRename(id){
+  closeCatMenu();
+  const sp=document.querySelector(`.cm-name[data-id="${id}"]`); const node=catById(id);
+  if(!sp||!node) return;
+  const inp=document.createElement('input'); inp.className='cm-name-input'; inp.value=node.name;
+  sp.replaceWith(inp); inp.focus(); inp.select();
+  let done=false;
+  const commit=()=>{ if(done) return; done=true; const v=inp.value.trim(); if(v){ node.name=v; save(); } render(); };
+  inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); commit(); } else if(e.key==='Escape'){ done=true; render(); } };
+  inp.onblur=commit;
+}
+// Notes-style row-actions dropdown
+let catMenuOutside=null;
+function closeCatMenu(){ const m=document.getElementById('catMenu'); if(m) m.remove(); if(catMenuOutside){ document.removeEventListener('mousedown',catMenuOutside,true); catMenuOutside=null; } }
+function openCatMenu(btn, opts){
+  closeCatMenu();
+  const {id,level,isRoot,kind}=opts;
+  const menu=document.createElement('div'); menu.id='catMenu'; menu.className='cm-menu';
+  const items=[];
+  if(isRoot){
+    items.push({label:T('add_group'), fn:()=>openAddGroup(kind)});
+  } else {
+    items.push({label:T('rename'), fn:()=>startRename(id)});
+    const info=catTxnInfo(id), hasTx=info.count>0;
+    items.push({label:T('delete'), danger:true, disabled:hasTx, title:hasTx?T('cant_delete_txn',info.count,info.lastDate):'',
+                fn:()=>{ if(confirm(T('del_node_confirm'))) deleteCategory(id); }});
+    if(level<3){
+      items.push({sep:true});
+      items.push({label: level===1?T('add_cat_full'):T('add_sub_full'),
+                  fn:()=>{ ui.catExpanded[id]=true; (level===1?openAddCategory:openAddSub)(id); }});
+    }
+  }
+  items.forEach(it=>{
+    if(it.sep){ const s=document.createElement('div'); s.className='sep'; menu.append(s); return; }
+    const b=document.createElement('button'); b.textContent=it.label;
+    if(it.danger) b.className='danger';
+    if(it.disabled){ b.disabled=true; if(it.title) b.title=it.title; }
+    b.onclick=()=>{ if(it.disabled) return; closeCatMenu(); it.fn(); };
+    menu.append(b);
+  });
+  document.body.append(menu);
+  const r=btn.getBoundingClientRect(), mw=menu.offsetWidth, mh=menu.offsetHeight;
+  let left=r.right-mw; if(left<8) left=8;
+  let top=r.bottom+4; if(top+mh>window.innerHeight-8) top=Math.max(8,r.top-mh-4);
+  menu.style.left=left+'px'; menu.style.top=top+'px';
+  catMenuOutside=e=>{ if(!menu.contains(e.target)) closeCatMenu(); };
+  setTimeout(()=>document.addEventListener('mousedown',catMenuOutside,true),0);
 }
 // expand/collapse helpers for the manager (only container nodes matter)
 function allExpanded(root){ let all=true; (root||[]).forEach(sec=>{ if(!ui.catExpanded[sec.id]) all=false; (sec.categories||[]).forEach(cat=>{ if((cat.subs||[]).length && !ui.catExpanded[cat.id]) all=false; }); }); return all; }
