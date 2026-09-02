@@ -317,6 +317,8 @@
   .txn-table tr:hover td{background:var(--surface-2);}
   .txn-table .amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;}
   .txn-table .amt.in{color:var(--green);}
+  .txn-table .amt.transfer{color:var(--ink-soft);}   /* internal transfer nets to zero — show neutral */
+  .txn-note-cell{color:var(--ink-soft);font-size:.8rem;max-width:220px;overflow:hidden;text-overflow:ellipsis;}
   .txn-actions{text-align:right;white-space:nowrap;}
   .txn-actions button{width:26px;height:26px;border-radius:var(--r-sm);color:var(--ink-soft);font-size:.92rem;
     opacity:0;transition:.1s;margin-left:2px;}
@@ -328,6 +330,7 @@
   .pill-cat.income{background:var(--green-bg);color:var(--green);}
   .pill-cat.transfer{background:#e9eefb;color:#3455b5;}
   .pill-cat.pocket{background:var(--green-bg);color:var(--brand-600);}
+  .txn-note{font-size:.72rem;color:var(--ink-soft);margin-top:2px;white-space:normal;}
   .acct.dragging{opacity:.4;}
   .acct.drag-over{box-shadow:inset 0 2px 0 var(--brand);}
   .acct[draggable=true]{cursor:grab;}
@@ -570,7 +573,7 @@ const I18N = {
     auth_sent:e=>`✓ Check your inbox — a login link was sent to ${e}.`, auth_error:m=>`Error: ${m}`,
     auth_loading:'Loading your data…', auth_conn_fail:'Could not connect to the sync service. Please refresh.',
     col_category:'Category', col_assigned:'Assigned', col_activity:'Activity', col_available:'Available',
-    add_category:'+ Category', add_group:'+ Add category group',
+    add_category:'+ Category',
     insp_pick_cat:'Select a category to set a target, assign, or move money.',
     available:'Available', target:'Target', target_type:'Target type', target_none:'No target',
     target_monthly:'Set aside monthly', target_balance:'Reach a balance', amount_zl:'Amount (zł)', save_target:'Save target',
@@ -594,8 +597,9 @@ const I18N = {
     starting_balance:'Starting balance (zł)', add:'Add', starting_balance_payee:'Starting balance', account_added:'Account added',
     new_txn:'New transaction', expense:'Expense', income:'Income', transfer:'Transfer', account:'Account',
     from_ep:'From (account / pocket)', to_ep:'To (account / pocket)', date:'Date', payee_note:'Payee / note', category:'Category',
+    payee:'Payee', note:'Note', note_ph:'Optional note',
     payee_ph:'e.g. Grocery store', unnamed:'(unnamed)', diff_places:'Choose two different places', transfer_done:'Transfer complete',
-    txn_added:'Transaction added', edit_txn:'Edit transaction', transfer_edit_note:'Edit transfers by deleting and re-adding',
+    txn_added:'Transaction added', edit_txn:'Edit transaction', edit_transfer:'Edit transfer', transfer_edit_note:'Edit transfers by deleting and re-adding',
     new_category:'New category', category_name:'Category name', category_ph:'e.g. Subscriptions',
     new_group:'New category group', group_name:'Group name', group_ph:'e.g. Kids',
     dash_income:'Income', dash_expenses:'Expenses', dash_month_balance:'Month balance', dash_net_worth:'Net worth',
@@ -628,7 +632,7 @@ const I18N = {
     auth_sent:e=>`✓ Sprawdź skrzynkę — link do logowania wysłany na ${e}.`, auth_error:m=>`Błąd: ${m}`,
     auth_loading:'Ładuję dane…', auth_conn_fail:'Nie udało się połączyć z usługą synchronizacji. Odśwież stronę.',
     col_category:'Kategoria', col_assigned:'Przypisane', col_activity:'Aktywność', col_available:'Dostępne',
-    add_category:'+ Kategoria', add_group:'+ Dodaj grupę kategorii',
+    add_category:'+ Kategoria',
     insp_pick_cat:'Wybierz kategorię, aby ustawić cel, przypisać lub przenieść pieniądze.',
     available:'Dostępne', target:'Cel', target_type:'Typ celu', target_none:'Brak celu',
     target_monthly:'Odkładaj co miesiąc', target_balance:'Uzbieraj saldo', amount_zl:'Kwota (zł)', save_target:'Zapisz cel',
@@ -652,8 +656,9 @@ const I18N = {
     starting_balance:'Saldo początkowe (zł)', add:'Dodaj', starting_balance_payee:'Saldo początkowe', account_added:'Dodano konto',
     new_txn:'Nowa transakcja', expense:'Wydatek', income:'Przychód', transfer:'Przelew', account:'Konto',
     from_ep:'Z (konto / podkonto)', to_ep:'Do (konto / podkonto)', date:'Data', payee_note:'Odbiorca / opis', category:'Kategoria',
+    payee:'Odbiorca', note:'Notatka', note_ph:'Notatka (opcjonalnie)',
     payee_ph:'np. Biedronka', unnamed:'(bez nazwy)', diff_places:'Wybierz różne miejsca', transfer_done:'Przelew wykonany',
-    txn_added:'Dodano transakcję', edit_txn:'Edytuj transakcję', transfer_edit_note:'Przelewy edytuj przez usunięcie i dodanie',
+    txn_added:'Dodano transakcję', edit_txn:'Edytuj transakcję', edit_transfer:'Edytuj przelew', transfer_edit_note:'Przelewy edytuj przez usunięcie i dodanie',
     new_category:'Nowa kategoria', category_name:'Nazwa kategorii', category_ph:'np. Subskrypcje',
     new_group:'Nowa grupa kategorii', group_name:'Nazwa grupy', group_ph:'np. Dzieci',
     dash_income:'Przychód', dash_expenses:'Wydatki', dash_month_balance:'Bilans miesiąca', dash_net_worth:'Wartość netto',
@@ -690,6 +695,8 @@ function nowInMonth(){
   const [y,m]=ui.month.split('-').map(Number);
   return `${ui.month}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
 }
+// real local "today" as YYYY-MM-DD (used as the default date for a new transaction)
+function todayISO(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 const parseAmt = s => { if(s==null) return 0; s=(''+s).replace(/\s/g,'').replace('zł','').replace(',','.'); const n=parseFloat(s); return isNaN(n)?0:Math.round(n*100); };
 
 const STORE = 'ynab_pl_budget_v1';
@@ -1393,8 +1400,10 @@ function accountsView(){
     .filter(t=>(!acct||t.accountId===acct.id) && txnMonth(t)===ui.month)
     .sort((a,b)=> a.date===b.date ? (b.seq||0)-(a.seq||0) : b.date.localeCompare(a.date));
   const bal = acct?acctBalance(acct.id):netWorth();
-  // monthly cash-flow summary (real movement: excludes internal pocket earmarks & opening balances)
-  const flow = state.transactions.filter(t=>(!acct||t.accountId===acct.id) && txnMonth(t)===ui.month && t.type!=='pocket' && !t.starting);
+  // monthly cash-flow summary (real movement: excludes internal pocket earmarks & opening balances).
+  // Across ALL accounts, internal account↔account transfers net to zero — exclude them so they aren't
+  // miscounted as income/expense; on a single account they're real movement for that account, so keep them.
+  const flow = state.transactions.filter(t=>(!acct||t.accountId===acct.id) && txnMonth(t)===ui.month && t.type!=='pocket' && !t.starting && (acct || t.type!=='transfer'));
   const inflow = flow.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
   const outflow = flow.filter(t=>t.amount<0).reduce((s,t)=>s+t.amount,0);
   const net = inflow+outflow;
@@ -1416,18 +1425,36 @@ function accountsView(){
     </div>
     ${summary}
     <table class="txn-table"><thead><tr>
-      <th>${T('col_date')}</th><th>${T('col_payee')}</th><th>${T('col_category')}</th>${acct?'':`<th>${T('col_account')}</th>`}<th style="text-align:right">${T('col_amount')}</th><th style="width:64px"></th>
+      <th>${T('col_date')}</th>${acct?'':`<th>${T('col_account')}</th>`}<th>${T('col_payee')}</th><th>${T('col_category')}</th><th>${T('note')}</th><th style="text-align:right">${T('col_amount')}</th><th style="width:64px"></th>
     </tr></thead><tbody>
-    ${txns.map(t=>{
+    ${(()=>{ const seenTr=new Set(); return txns.map(t=>{
+      const acts=id=>`<td class="txn-actions"><button class="tx-edit" data-txedit="${id}" title="${T('edit')}">✎</button><button class="tx-del" data-txdel="${id}" title="${T('delete')}">✕</button></td>`;
+      // ALL accounts: collapse an internal transfer to ONE row — Account = from, Payee = to, Category = "Transfer"
+      if(!acct && t.type==='transfer'){
+        if(seenTr.has(t.transferId)) return '';
+        seenTr.add(t.transferId);
+        const from = t.amount<0 ? t : (state.transactions.find(x=>x.transferId===t.transferId && x.amount<0) || t);
+        return `<tr data-txnrow="${from.id}">
+          <td>${from.date}</td>
+          <td style="color:var(--ink-soft)">${escapeHtml(acctName(from.accountId))}</td>
+          <td>${escapeHtml(acctName(from.transferAccountId))}</td>
+          <td><span class="pill-cat transfer">${T('transfer')}</span></td>
+          <td class="txn-note-cell">${from.memo?escapeHtml(from.memo):''}</td>
+          <td class="amt transfer">${fmt(Math.abs(from.amount))}</td>
+          ${acts(from.id)}</tr>`;
+      }
       const cat = catCell(t);
       const an = state.accounts.find(a=>a.id===t.accountId);
-      const editable = t.type!=='transfer' && t.type!=='pocket';
+      const editable = t.type!=='pocket';   // transfers are editable (date/note) via openEditTransfer; pockets aren't
       return `<tr data-txnrow="${t.id}">
-        <td>${t.date}</td><td>${t.payee}</td><td>${cat}</td>
-        ${acct?'':`<td style="color:var(--ink-soft)">${an?an.name:''}</td>`}
+        <td>${t.date}</td>
+        ${acct?'':`<td style="color:var(--ink-soft)">${an?escapeHtml(an.name):''}</td>`}
+        <td>${escapeHtml(t.payee)}</td>
+        <td>${cat}</td>
+        <td class="txn-note-cell">${t.memo?escapeHtml(t.memo):''}</td>
         <td class="amt ${t.amount>0?'in':''}">${fmt(t.amount)}</td>
-        <td class="txn-actions">${editable?`<button class="tx-edit" data-txedit="${t.id}" title="${T('edit')}">✎</button>`:''}<button class="tx-del" data-txdel="${t.id}" title="${T('delete')}">✕</button></td></tr>`;
-    }).join('')||`<tr><td colspan="${acct?5:6}" style="text-align:center;color:var(--ink-soft);padding:30px">${T('no_txn_month')}</td></tr>`}
+        ${editable?acts(t.id):`<td class="txn-actions"><button class="tx-del" data-txdel="${t.id}" title="${T('delete')}">✕</button></td>`}</tr>`;
+    }).join(''); })()||`<tr><td colspan="${acct?6:7}" style="text-align:center;color:var(--ink-soft);padding:30px">${T('no_txn_month')}</td></tr>`}
     </tbody></table>`;
   el.append(wrap);
   wrap.querySelector('#acctChooser').onchange=e=>{ui.selAcct=e.target.value;ui.acctSheet=false;render();};
@@ -1748,12 +1775,13 @@ function openAddTxn(){
         <div class="field"><label>${T('to_ep')}</label><select id="txTo">${endpointOptions()}</select></div>
       </div>
       <div class="row2">
-        <div class="field"><label>${T('date')}</label><input id="txDate" type="date" value="${ui.month}-15"></div>
+        <div class="field"><label>${T('date')}</label><input id="txDate" type="date" value="${todayISO()}"></div>
         <div class="field"><label>${T('amount_zl')}</label><input id="txAmt" type="text" placeholder="0,00"></div>
       </div>
-      <div class="field" id="txPayeeField"><label>${T('payee_note')}</label>
-        <div class="payee-combo"><input id="txPayee" type="text" autocomplete="off" placeholder="${T('payee_ph')}"><div class="cc-list"></div></div></div>
       <div class="field" id="txCatField"><label>${T('category')}</label>${catComboHTML('txCat','')}</div>
+      <div class="field" id="txNoteField"><label>${T('note')}</label><input id="txNote" type="text" placeholder="${T('note_ph')}"></div>
+      <div class="field" id="txPayeeField"><label>${T('payee')}</label>
+        <div class="payee-combo"><input id="txPayee" type="text" autocomplete="off" placeholder="${T('payee_ph')}"><div class="cc-list"></div></div></div>
     </div>
     <div class="modal-f"><button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="txSave">${T('save')}</button></div></div>`);
   const $=s=>modalHost.querySelector(s);
@@ -1766,6 +1794,7 @@ function openAddTxn(){
     $('#normalFields').style.display=t==='tr'?'none':'block';
     $('#transferFields').style.display=t==='tr'?'block':'none';
     $('#txPayeeField').style.display=t==='tr'?'none':'block';
+    $('#txNoteField').style.display=t==='tr'?'none':'block';
     $('#txCatField').style.display=t==='tr'?'none':'block';
     if((prev==='in')!==(t==='in')) clearCat();   // switching between income/expense trees resets the picker
   };
@@ -1779,10 +1808,11 @@ function openAddTxn(){
       doTransfer(from,to,amt,date); closeModal(); toast(T('transfer_done')); render(); return;
     }
     const payee=$('#txPayee').value.trim();
+    const note=$('#txNote').value.trim();
     const cid = type==='in' ? ($('#txCat').value||RTA()) : $('#txCat').value;   // uncategorized income still lands in Ready to Assign
     state.transactions.push({id:uid('t'),seq:nextSeq(),date,accountId:$('#txAcct').value,
       payee:payee||T('unnamed'), categoryId:cid,
-      amount: type==='in'?amt:-amt, memo:'', cleared:false});
+      amount: type==='in'?amt:-amt, memo:note, cleared:false});
     rememberPayee(cid, payee);
     closeModal(); toast(T('txn_added')); render();
   };
@@ -1791,7 +1821,8 @@ function openAddTxn(){
 // Edit an existing normal (expense/income) transaction
 function openEditTxn(id){
   const t=state.transactions.find(x=>x.id===id); if(!t) return;
-  if(t.type==='transfer'||t.type==='pocket'){ toast(T('transfer_edit_note')); return; }
+  if(t.type==='transfer'){ openEditTransfer(id); return; }
+  if(t.type==='pocket'){ toast(T('transfer_edit_note')); return; }
   const cats=allCats();
   const grosz=g=>g?(g/100).toFixed(2).replace('.',','):'';
   openModal(`<div class="modal"><div class="modal-h"><h3>${T('edit_txn')}</h3><button class="x" data-close>×</button></div>
@@ -1802,9 +1833,10 @@ function openEditTxn(id){
         <div class="field"><label>${T('date')}</label><input id="txDate" type="date" value="${t.date}"></div>
         <div class="field"><label>${T('amount_zl')}</label><input id="txAmt" type="text" value="${grosz(Math.abs(t.amount))}"></div>
       </div>
-      <div class="field"><label>${T('payee_note')}</label>
-        <div class="payee-combo"><input id="txPayee" type="text" autocomplete="off" value="${(t.payee||'').replace(/"/g,'&quot;')}"><div class="cc-list"></div></div></div>
       <div class="field" id="txCatField"><label>${T('category')}</label>${catComboHTML('txCat', t.categoryId)}</div>
+      <div class="field"><label>${T('note')}</label><input id="txNote" type="text" placeholder="${T('note_ph')}" value="${(t.memo||'').replace(/"/g,'&quot;')}"></div>
+      <div class="field"><label>${T('payee')}</label>
+        <div class="payee-combo"><input id="txPayee" type="text" autocomplete="off" value="${(t.payee||'').replace(/"/g,'&quot;')}"><div class="cc-list"></div></div></div>
     </div>
     <div class="modal-f">
       <button class="mini-btn" id="txDel" style="background:none;color:var(--red);width:auto;margin:0 auto 0 0;padding:8px 2px">${T('delete')}</button>
@@ -1825,6 +1857,7 @@ function openEditTxn(id){
     const payee=$('#txPayee').value.trim();
     t.date=$('#txDate').value;
     t.accountId=$('#txAcct').value;
+    t.memo=$('#txNote').value.trim();
     t.payee=payee||T('unnamed');
     t.categoryId = type==='in' ? ($('#txCat').value||RTA()) : $('#txCat').value;
     t.amount = type==='in' ? amt : -amt;
@@ -1832,6 +1865,32 @@ function openEditTxn(id){
     closeModal(); toast(T('changes_saved')); render();
   };
   $('#txDel').onclick=()=>{ if(confirm(T('del_txn_confirm'))){ closeModal(); deleteTransaction(t.id); } };
+}
+
+// Edit an internal transfer: date + note apply to BOTH legs (and any linked pocket earmarks).
+// Amount/accounts stay edit-by-delete-and-re-add.
+function openEditTransfer(id){
+  const t0=state.transactions.find(x=>x.id===id); if(!t0||!t0.transferId){ toast(T('transfer_edit_note')); return; }
+  const legs=state.transactions.filter(x=>x.transferId===t0.transferId);
+  const out=legs.find(l=>l.type==='transfer'&&l.amount<0) || legs.find(l=>l.amount<0) || legs[0];
+  const fromName=acctName(out.accountId), toName=acctName(out.transferAccountId||out.accountId), amt=Math.abs(out.amount);
+  openModal(`<div class="modal"><div class="modal-h"><h3>${T('edit_transfer')}</h3><button class="x" data-close>×</button></div>
+    <div class="modal-b">
+      <div class="tgt-txt" style="margin-bottom:12px">${escapeHtml(fromName)} → ${escapeHtml(toName)} · <b>${fmt(amt)}</b></div>
+      <div class="field"><label>${T('date')}</label><input id="trDate" type="date" value="${t0.date}"></div>
+      <div class="field"><label>${T('note')}</label><input id="trNote" type="text" placeholder="${T('note_ph')}" value="${(t0.memo||'').replace(/"/g,'&quot;')}"></div>
+    </div>
+    <div class="modal-f">
+      <button class="mini-btn" id="trDel" style="background:none;color:var(--red);width:auto;margin:0 auto 0 0;padding:8px 2px">${T('delete')}</button>
+      <button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="trSave">${T('save')}</button></div></div>`);
+  const $=s=>modalHost.querySelector(s);
+  $('#trSave').onclick=()=>{
+    const d=$('#trDate').value; if(!d){toast(T('enter_amount'));return;}
+    const note=$('#trNote').value.trim();
+    legs.forEach(l=>{ l.date=d; l.memo=note; });   // keep both legs in sync
+    closeModal(); toast(T('changes_saved')); render();
+  };
+  $('#trDel').onclick=()=>{ if(confirm(T('del_txn_confirm'))){ closeModal(); deleteTransaction(t0.id); } };
 }
 function typeOptions(sel){
   return ['checking','savings','cash','credit','tracking']
