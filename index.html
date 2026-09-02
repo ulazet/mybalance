@@ -319,6 +319,14 @@
   .txn-table .amt.in{color:var(--green);}
   .txn-table .amt.transfer{color:var(--ink-soft);}   /* internal transfer nets to zero — show neutral */
   .txn-note-cell{color:var(--ink-soft);font-size:.8rem;max-width:220px;overflow:hidden;text-overflow:ellipsis;}
+  /* Ready-to-Assign breakdown modal */
+  .rb-sec-h{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);font-weight:700;margin:4px 0 2px;}
+  .rb-sub{font-size:.72rem;color:var(--ink-soft);margin:10px 0 0;}
+  .rb-row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-size:.86rem;}
+  .rb-row.total{font-weight:700;border-bottom:none;border-top:2px solid var(--line);margin-top:2px;}
+  .rb-row.big{font-size:1.02rem;}
+  .rb-amt{font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .rb-amt.neg{color:var(--red);}
   .txn-actions{text-align:right;white-space:nowrap;}
   .txn-actions button{width:26px;height:26px;border-radius:var(--r-sm);color:var(--ink-soft);font-size:.92rem;
     opacity:0;transition:.1s;margin-left:2px;}
@@ -563,7 +571,12 @@ const MONTHS = {
 };
 const I18N = {
   en:{
-    tagline:'Home budget · PLN', ready_to_assign:'Ready to<br>assign', rta_tip:'Click to fund all monthly targets',
+    tagline:'Home budget · PLN', ready_to_assign:'Ready to<br>assign', rta_tip:'Click for the Ready-to-Assign breakdown',
+    rta_breakdown_title:'Ready to Assign — breakdown', rta_inflows:'Inflows to budget', rta_assigned:'Assigned (all months)',
+    rta_future_note:'incl. future months', rta_reconcile:'Reconciliation with your money', rta_onbudget_cash:'On-budget accounts hold',
+    rta_reserved:'Reserved in categories', rta_uncat:'Uncategorized / debt', rta_overspent:'Overspent categories',
+    rta_check:'Check (should equal cash)', none:'None', close:'Close',
+    rta_explain:'Ready to Assign = inflows − assigned. It does NOT subtract spending, so it can exceed your cash when categories are overspent or you have uncategorized/debt outflows — that money is already spent but still shows as unassigned.',
     add_txn:'Transaction',
     nav_dashboard:'Dashboard', nav_budget:'Budget', nav_transactions:'Transactions', nav_accounts:'Accounts', nav_reports:'Reports', nav_more:'More',
     on_budget:'On-budget', tracking:'Tracking', add_account:'+ Add account', net_worth:'Net worth',
@@ -622,7 +635,12 @@ const I18N = {
     tab_spending:'Spending', tab_income:'Income', col_expected:'Expected', col_actual:'Actual', col_difference:'Difference', income_by_source:'Income by source'
   },
   pl:{
-    tagline:'Budżet domowy · PLN', ready_to_assign:'Do<br>przypisania', rta_tip:'Kliknij, aby sfinansować cele miesięczne',
+    tagline:'Budżet domowy · PLN', ready_to_assign:'Do<br>przypisania', rta_tip:'Kliknij, aby zobaczyć szczegóły',
+    rta_breakdown_title:'Do rozdysponowania — szczegóły', rta_inflows:'Wpływy do budżetu', rta_assigned:'Rozdysponowano (wsz. miesiące)',
+    rta_future_note:'w tym przyszłe miesiące', rta_reconcile:'Uzgodnienie z pieniędzmi', rta_onbudget_cash:'Na kontach budżetowych',
+    rta_reserved:'Zarezerwowane w kategoriach', rta_uncat:'Bez kategorii / dług', rta_overspent:'Przekroczone kategorie',
+    rta_check:'Kontrola (= gotówka)', none:'Brak', close:'Zamknij',
+    rta_explain:'Do rozdysponowania = wpływy − rozdysponowane. NIE odejmuje wydatków, więc może przekroczyć gotówkę, gdy kategorie są przekroczone lub masz wydatki bez kategorii/dług — te pieniądze są już wydane, ale wciąż pokazują się jako nieprzypisane.',
     add_txn:'Transakcja',
     nav_dashboard:'Pulpit', nav_budget:'Budżet', nav_transactions:'Transakcje', nav_accounts:'Konta', nav_reports:'Raporty', nav_more:'Więcej',
     on_budget:'Budżetowe', tracking:'Śledzone', add_account:'+ Dodaj konto', net_worth:'Wartość netto',
@@ -959,6 +977,59 @@ function readyToAssign(){
   return inflow - assignedTotal;
 }
 function netWorth(){ return state.accounts.reduce((s,a)=>s+acctBalance(a.id),0); }
+// Itemise how Ready to Assign is built, and reconcile it against the real on-budget cash.
+function rtaBreakdown(){
+  const inc=incomeIdSet();
+  const src={}; let inflow=0;
+  state.transactions.forEach(t=>{
+    let label=null;
+    if(t.categoryId===RTA()) label = t.starting ? T('starting_balance_payee') : (t.payee||T('pill_income'));
+    else if(inc.has(t.categoryId)) label = nodePathById(t.categoryId)||T('pill_income');
+    if(label!==null){ src[label]=(src[label]||0)+t.amount; inflow+=t.amount; }
+  });
+  let assigned=0, future=0;
+  for(const [m,obj] of Object.entries(state.assignments||{})) for(const v of Object.values(obj)){ assigned+=v; if(m>ui.month) future+=v; }
+  const rta=inflow-assigned;
+  const onBudgetCash = state.accounts.filter(a=>a.onBudget).reduce((s,a)=>s+acctBalance(a.id),0);
+  // latest month present (assignments feed available cumulatively)
+  let latest=ui.month; state.transactions.forEach(t=>{ if(txnMonth(t)>latest) latest=txnMonth(t); });
+  Object.keys(state.assignments||{}).forEach(k=>{ if(k>latest) latest=k; });
+  // reserved = Σ available across expense sections (rolled); overspent = sections whose rolled available < 0
+  let reserved=0; const overspent=[];
+  (state.groups||[]).forEach(sec=>{ const avl=rolled(sec,latest,available); reserved+=avl; if(avl<0) overspent.push({name:sec.name,amt:avl}); });
+  // uncategorized / debt: real money on on-budget accounts with no category (excl. internal pocket earmarks)
+  const onBudgetIds=new Set(state.accounts.filter(a=>a.onBudget).map(a=>a.id));
+  let uncat=0;
+  state.transactions.forEach(t=>{ if(onBudgetIds.has(t.accountId) && t.type!=='pocket' && !t.categoryId) uncat+=t.amount; });
+  return {inflow, src, assigned, future, rta, onBudgetCash, reserved, overspent, uncat};
+}
+function openRtaBreakdown(){
+  const b=rtaBreakdown();
+  const inflowRows=Object.entries(b.src).sort((x,y)=>y[1]-x[1])
+    .map(([k,v])=>`<div class="rb-row"><span>${escapeHtml(k)}</span><span class="rb-amt">${fmt(v)}</span></div>`).join('')
+    || `<div class="rb-row"><span style="color:var(--ink-soft)">${T('none')}</span></div>`;
+  const overRows=b.overspent.length
+    ? b.overspent.map(o=>`<div class="rb-row"><span>${escapeHtml(o.name)}</span><span class="rb-amt neg">${fmt(o.amt)}</span></div>`).join('')
+    : `<div class="rb-row"><span style="color:var(--ink-soft)">${T('none')}</span></div>`;
+  const checkSum=b.rta+b.reserved+b.uncat, ok=Math.abs(checkSum-b.onBudgetCash)<1;
+  openModal(`<div class="modal"><div class="modal-h"><h3>${T('rta_breakdown_title')}</h3><button class="x" data-close>×</button></div>
+    <div class="modal-b" style="max-height:62vh;overflow:auto">
+      <div class="rb-sec-h">${T('rta_inflows')}</div>
+      ${inflowRows}
+      <div class="rb-row total"><span>${T('rta_inflows')}</span><span class="rb-amt">${fmt(b.inflow)}</span></div>
+      <div class="rb-row"><span>${T('rta_assigned')}${b.future?` <span style="color:var(--ink-soft);font-size:.82em">(${T('rta_future_note')}: ${fmt(b.future)})</span>`:''}</span><span class="rb-amt">−${fmt(b.assigned)}</span></div>
+      <div class="rb-row total big"><span>${T('ready_to_assign').replace('<br>',' ')}</span><span class="rb-amt ${b.rta<0?'neg':''}">${fmt(b.rta)}</span></div>
+      <div class="rb-sec-h" style="margin-top:16px">${T('rta_reconcile')}</div>
+      <div class="rb-row"><span>${T('rta_onbudget_cash')}</span><span class="rb-amt">${fmt(b.onBudgetCash)}</span></div>
+      <div class="rb-row"><span>${T('rta_reserved')}</span><span class="rb-amt">${fmt(b.reserved)}</span></div>
+      <div class="rb-row"><span>${T('rta_uncat')}</span><span class="rb-amt ${b.uncat<0?'neg':''}">${fmt(b.uncat)}</span></div>
+      <div class="rb-sub">${T('rta_overspent')}</div>
+      ${overRows}
+      <div class="rb-row total"><span>${T('rta_check')}</span><span class="rb-amt ${ok?'':'neg'}">${fmt(checkSum)} ${ok?'✓':'⚠'}</span></div>
+      <div class="tgt-txt" style="margin-top:12px">${T('rta_explain')}</div>
+    </div>
+    <div class="modal-f"><button class="btn" data-close>${T('close')}</button></div></div>`);
+}
 
 /* target progress: returns {needed, funded, pct, state:'funded'|'under'|'none'} */
 function targetInfo(cat, mKey){
@@ -1048,6 +1119,7 @@ function renderRTA(){
   const v=readyToAssign(); const p=document.getElementById('rtaPill');
   document.getElementById('rtaAmt').textContent=fmt(v);
   p.className='rta '+(v>0?'pos':v<0?'neg':'zero');
+  p.style.cursor='pointer'; p.title=T('rta_tip'); p.onclick=openRtaBreakdown;
 }
 
 function renderSidebar(){
