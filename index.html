@@ -576,6 +576,8 @@ const I18N = {
     rta_future_note:'incl. future months', rta_reconcile:'Reconciliation with your money', rta_onbudget_cash:'On-budget accounts hold',
     rta_reserved:'Reserved in categories', rta_uncat:'Uncategorized / debt', rta_overspent:'Overspent categories',
     rta_check:'Check (should equal cash)', none:'None', close:'Close',
+    rta_by_month:'Assigned by month', rta_orphan:'Orphaned assignments (deleted categories)', rta_purge:'Remove orphaned assignments',
+    rta_purge_done:m=>`Removed ${m} of orphaned assignments`,
     rta_explain:'Ready to Assign = inflows − assigned. It does NOT subtract spending, so it can exceed your cash when categories are overspent or you have uncategorized/debt outflows — that money is already spent but still shows as unassigned.',
     add_txn:'Transaction',
     nav_dashboard:'Dashboard', nav_budget:'Budget', nav_transactions:'Transactions', nav_accounts:'Accounts', nav_reports:'Reports', nav_more:'More',
@@ -640,6 +642,8 @@ const I18N = {
     rta_future_note:'w tym przyszłe miesiące', rta_reconcile:'Uzgodnienie z pieniędzmi', rta_onbudget_cash:'Na kontach budżetowych',
     rta_reserved:'Zarezerwowane w kategoriach', rta_uncat:'Bez kategorii / dług', rta_overspent:'Przekroczone kategorie',
     rta_check:'Kontrola (= gotówka)', none:'Brak', close:'Zamknij',
+    rta_by_month:'Rozdysponowano wg miesiąca', rta_orphan:'Osierocone przypisania (usunięte kategorie)', rta_purge:'Usuń osierocone przypisania',
+    rta_purge_done:m=>`Usunięto osierocone przypisania: ${m}`,
     rta_explain:'Do rozdysponowania = wpływy − rozdysponowane. NIE odejmuje wydatków, więc może przekroczyć gotówkę, gdy kategorie są przekroczone lub masz wydatki bez kategorii/dług — te pieniądze są już wydane, ale wciąż pokazują się jako nieprzypisane.',
     add_txn:'Transakcja',
     nav_dashboard:'Pulpit', nav_budget:'Budżet', nav_transactions:'Transakcje', nav_accounts:'Konta', nav_reports:'Raporty', nav_more:'Więcej',
@@ -987,8 +991,11 @@ function rtaBreakdown(){
     else if(inc.has(t.categoryId)) label = nodePathById(t.categoryId)||T('pill_income');
     if(label!==null){ src[label]=(src[label]||0)+t.amount; inflow+=t.amount; }
   });
-  let assigned=0, future=0;
-  for(const [m,obj] of Object.entries(state.assignments||{})) for(const v of Object.values(obj)){ assigned+=v; if(m>ui.month) future+=v; }
+  let assigned=0, future=0, orphan=0; const byMonth={}; const orphanList=[];
+  for(const [m,obj] of Object.entries(state.assignments||{})) for(const [cid,v] of Object.entries(obj)){
+    assigned+=v; if(m>ui.month) future+=v; byMonth[m]=(byMonth[m]||0)+v;
+    if(!catById(cid)){ orphan+=v; orphanList.push({id:cid,m,amt:v}); }   // assignment on a category that no longer exists
+  }
   const rta=inflow-assigned;
   const onBudgetCash = state.accounts.filter(a=>a.onBudget).reduce((s,a)=>s+acctBalance(a.id),0);
   // latest month present (assignments feed available cumulatively)
@@ -1001,7 +1008,15 @@ function rtaBreakdown(){
   const onBudgetIds=new Set(state.accounts.filter(a=>a.onBudget).map(a=>a.id));
   let uncat=0;
   state.transactions.forEach(t=>{ if(onBudgetIds.has(t.accountId) && t.type!=='pocket' && !t.categoryId) uncat+=t.amount; });
-  return {inflow, src, assigned, future, rta, onBudgetCash, reserved, overspent, uncat};
+  return {inflow, src, assigned, future, rta, onBudgetCash, reserved, overspent, uncat, byMonth, orphan, orphanList};
+}
+// remove assignments that point at categories which no longer exist (frees up Ready to Assign)
+function purgeOrphanAssignments(){
+  let removed=0;
+  for(const obj of Object.values(state.assignments||{})) for(const cid of Object.keys(obj)){
+    if(!catById(cid)){ removed+=obj[cid]; delete obj[cid]; }
+  }
+  save(); return removed;
 }
 function openRtaBreakdown(){
   const b=rtaBreakdown();
@@ -1012,13 +1027,21 @@ function openRtaBreakdown(){
     ? b.overspent.map(o=>`<div class="rb-row"><span>${escapeHtml(o.name)}</span><span class="rb-amt neg">${fmt(o.amt)}</span></div>`).join('')
     : `<div class="rb-row"><span style="color:var(--ink-soft)">${T('none')}</span></div>`;
   const checkSum=b.rta+b.reserved+b.uncat, ok=Math.abs(checkSum-b.onBudgetCash)<1;
+  const months=Object.keys(b.byMonth).sort();
+  const monthRows = months.length>1 ? `<div class="rb-sub">${T('rta_by_month')}</div>`+
+    months.map(m=>`<div class="rb-row"><span>${m}</span><span class="rb-amt">${fmt(b.byMonth[m])}</span></div>`).join('') : '';
+  const orphanBlock = b.orphan ? `<div class="rb-sec-h" style="margin-top:16px;color:var(--red)">⚠ ${T('rta_orphan')}</div>
+      <div class="rb-row"><span style="color:var(--ink-soft)">${b.orphanList.length} ${b.orphanList.length===1?'entry':'entries'}</span><span class="rb-amt neg">${fmt(b.orphan)}</span></div>
+      <button class="btn" id="rbPurge" style="margin:8px 0 4px">${T('rta_purge')}</button>` : '';
   openModal(`<div class="modal"><div class="modal-h"><h3>${T('rta_breakdown_title')}</h3><button class="x" data-close>×</button></div>
     <div class="modal-b" style="max-height:62vh;overflow:auto">
       <div class="rb-sec-h">${T('rta_inflows')}</div>
       ${inflowRows}
       <div class="rb-row total"><span>${T('rta_inflows')}</span><span class="rb-amt">${fmt(b.inflow)}</span></div>
       <div class="rb-row"><span>${T('rta_assigned')}${b.future?` <span style="color:var(--ink-soft);font-size:.82em">(${T('rta_future_note')}: ${fmt(b.future)})</span>`:''}</span><span class="rb-amt">−${fmt(b.assigned)}</span></div>
+      ${monthRows}
       <div class="rb-row total big"><span>${T('ready_to_assign').replace('<br>',' ')}</span><span class="rb-amt ${b.rta<0?'neg':''}">${fmt(b.rta)}</span></div>
+      ${orphanBlock}
       <div class="rb-sec-h" style="margin-top:16px">${T('rta_reconcile')}</div>
       <div class="rb-row"><span>${T('rta_onbudget_cash')}</span><span class="rb-amt">${fmt(b.onBudgetCash)}</span></div>
       <div class="rb-row"><span>${T('rta_reserved')}</span><span class="rb-amt">${fmt(b.reserved)}</span></div>
@@ -1029,6 +1052,8 @@ function openRtaBreakdown(){
       <div class="tgt-txt" style="margin-top:12px">${T('rta_explain')}</div>
     </div>
     <div class="modal-f"><button class="btn" data-close>${T('close')}</button></div></div>`);
+  const pg=modalHost.querySelector('#rbPurge');
+  if(pg) pg.onclick=()=>{ const removed=purgeOrphanAssignments(); toast(T('rta_purge_done', fmt(removed))); closeModal(); render(); };
 }
 
 /* target progress: returns {needed, funded, pct, state:'funded'|'under'|'none'} */
