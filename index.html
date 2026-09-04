@@ -1654,7 +1654,7 @@ function accountsView(){
     </div>
     ${summary}
     <table class="txn-table"><thead><tr>
-      <th>${T('col_date')}</th>${acct?'':`<th>${T('col_account')}</th>`}<th>${T('col_payee')}</th><th>${T('col_category')}</th><th>${T('note')}</th><th style="text-align:right">${T('col_amount')}</th><th style="width:64px"></th>
+      <th>${T('col_date')}</th>${acct?'':`<th>${T('col_account')}</th>`}<th>${T('col_payee')}</th><th>${T('col_category')}</th><th>${T('tag')}</th><th>${T('note')}</th><th style="text-align:right">${T('col_amount')}</th><th style="width:64px"></th>
     </tr></thead><tbody>
     ${(()=>{ const seenTr=new Set(), seenSplit=new Set(); return txns.map(t=>{
       const acts=id=>`<td class="txn-actions"><button class="tx-edit" data-txedit="${id}" title="${T('edit')}">✎</button><button class="tx-del" data-txdel="${id}" title="${T('delete')}">✕</button></td>`;
@@ -1674,7 +1674,8 @@ function accountsView(){
           ${acct?'':`<td style="color:var(--ink-soft)">${an?escapeHtml(an.name):''}</td>`}
           <td>${escapeHtml(t.payee)}</td>
           <td><span class="pill-cat split clickable" data-splitedit="${t.id}" title="${T('edit')}">⧉ ${T('split')}</span></td>
-          <td class="txn-note-cell">${sharedTag}${sharedNote?`<span class="txn-note-txt">${escapeHtml(sharedNote)}</span>`:''}</td>
+          <td>${sharedTag}</td>
+          <td class="txn-note-cell">${sharedNote?escapeHtml(sharedNote):''}</td>
           <td class="amt ${sum>0?'in':''}">${fmt(sum)}</td>
           ${acts(t.id)}</tr>`;
       }
@@ -1688,6 +1689,7 @@ function accountsView(){
           <td style="color:var(--ink-soft)">${escapeHtml(acctName(from.accountId))}</td>
           <td>${escapeHtml(acctName(from.transferAccountId))}</td>
           <td><span class="pill-cat transfer">${T('transfer')}</span></td>
+          <td></td>
           <td class="txn-note-cell">${from.memo?escapeHtml(from.memo):''}</td>
           <td class="amt transfer">${fmt(Math.abs(from.amount))}</td>
           ${acts(from.id)}</tr>`;
@@ -1700,10 +1702,11 @@ function accountsView(){
         ${acct?'':`<td style="color:var(--ink-soft)">${an?escapeHtml(an.name):''}</td>`}
         <td>${escapeHtml(t.payee)}</td>
         <td>${cat}</td>
-        <td class="txn-note-cell">${tagBadge(t.tagId)}${t.memo?`<span class="txn-note-txt">${escapeHtml(t.memo)}</span>`:''}</td>
+        <td>${tagBadge(t.tagId)}</td>
+        <td class="txn-note-cell">${t.memo?escapeHtml(t.memo):''}</td>
         <td class="amt ${t.amount>0?'in':''}">${fmt(t.amount)}</td>
         ${editable?acts(t.id):`<td class="txn-actions"><button class="tx-del" data-txdel="${t.id}" title="${T('delete')}">✕</button></td>`}</tr>`;
-    }).join(''); })()||`<tr><td colspan="${acct?6:7}" style="text-align:center;color:var(--ink-soft);padding:30px">${T('no_txn_month')}</td></tr>`}
+    }).join(''); })()||`<tr><td colspan="${acct?7:8}" style="text-align:center;color:var(--ink-soft);padding:30px">${T('no_txn_month')}</td></tr>`}
     </tbody></table>`;
   el.append(wrap);
   wrap.querySelector('#acctChooser').onchange=e=>{ui.selAcct=e.target.value;ui.acctSheet=false;render();};
