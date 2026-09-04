@@ -320,7 +320,9 @@
   .txn-table .amt.transfer{color:var(--ink-soft);}   /* internal transfer nets to zero — show neutral */
   .txn-note-cell{color:var(--ink-soft);font-size:.8rem;max-width:220px;overflow:hidden;text-overflow:ellipsis;}
   .pill-cat.split{background:#efeafe;color:#6a41c9;}
-  .spl-breakdown{font-size:.72rem;color:var(--ink-soft);margin-top:3px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pill-cat.split.clickable{cursor:pointer;} .pill-cat.split.clickable:hover{background:#e2d8fb;}
+  .txn-note-txt{color:var(--ink-soft);}
+  .tag-badge + .txn-note-txt{margin-left:6px;}
   /* tags */
   .tag-badge{display:inline-block;padding:1px 8px;border-radius:var(--r-pill);font-size:.68rem;font-weight:700;
     color:var(--tc);background:color-mix(in srgb, var(--tc) 15%, transparent);vertical-align:middle;white-space:nowrap;}
@@ -340,6 +342,12 @@
   .tgm-del{width:30px;height:30px;border-radius:var(--r-sm);color:var(--ink-soft);flex:0 0 auto;}
   .tgm-del:hover:not(:disabled){background:var(--red-bg);color:var(--red);} .tgm-del:disabled{opacity:.3;cursor:not-allowed;}
   .tgm-add{display:flex;gap:8px;margin-top:12px;} .tgm-add input{flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm);outline:none;}
+  /* color picker popover */
+  .color-pop{position:fixed;z-index:70;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--sh-3);padding:10px;display:grid;grid-template-columns:repeat(4,auto);gap:9px;}
+  .cp-dot{width:24px;height:24px;border-radius:50%;border:2px solid #fff;box-shadow:var(--sh-1);cursor:pointer;padding:0;}
+  .cp-dot.on{outline:2px solid var(--ink);outline-offset:1px;}
+  .cp-custom{width:24px;height:24px;border-radius:50%;cursor:pointer;overflow:hidden;position:relative;background:conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red);border:2px solid #fff;box-shadow:var(--sh-1);}
+  .cp-custom input[type=color]{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;border:none;padding:0;}
   /* split editor lines */
   .spl-line{margin-bottom:12px;padding-bottom:10px;border-bottom:1px dashed var(--line);}
   .spl-line-main{display:flex;gap:8px;align-items:center;}
@@ -400,14 +408,14 @@
     align-items:center;justify-content:center;z-index:50;}
   .overlay.show{display:flex;}
   .modal{background:var(--surface);border-radius:var(--r-lg);width:440px;max-width:calc(100vw - 40px);box-shadow:var(--sh-3);
-    overflow:hidden;animation:pop .18s ease;}
+    overflow:hidden;animation:pop .18s ease;display:flex;flex-direction:column;max-height:calc(100vh - 40px);}
   @keyframes pop{from{transform:scale(.96) translateY(8px);opacity:0;}to{transform:none;opacity:1;}}
-  .modal-h{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
+  .modal-h{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex:0 0 auto;}
   .modal-h h3{margin:0;font-size:1.1rem;}
   .modal-h .x{font-size:1.4rem;color:var(--ink-soft);width:30px;height:30px;border-radius:var(--r-sm);}
   .modal-h .x:hover{background:var(--surface-2);}
-  .modal-b{padding:22px;}
-  .modal-f{padding:16px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;}
+  .modal-b{padding:22px;overflow-y:auto;flex:1 1 auto;}
+  .modal-f{padding:16px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;flex:0 0 auto;}
   .seg{display:flex;background:var(--surface-2);border-radius:var(--r-sm);padding:3px;margin-bottom:14px;}
   .seg button{flex:1;padding:8px;border-radius:var(--r-sm);font-weight:600;font-size:.86rem;color:var(--ink-soft);}
   .seg button.on{background:var(--surface);color:var(--ink);box-shadow:var(--sh-1);}
@@ -653,7 +661,7 @@ const I18N = {
     txn_added:'Transaction added', edit_txn:'Edit transaction', edit_transfer:'Edit transfer', transfer_edit_note:'Edit transfers by deleting and re-adding',
     split:'Split', split_txn:'Split transaction', add_line:'+ Add line', split_total:'Total',
     split_over:n=>`Lines exceed the total by ${n}`, split_balances:'The first row auto-adjusts so the lines always match the total',
-    tag:'Tag', tags:'Tags', no_tag:'No tag', new_tag:'New tag', manage_tags:'Manage tags', tag_manager:'Tags', untagged:'Untagged',
+    tag:'Tag', tags:'Tags', no_tag:'No tag', new_tag:'New tag', manage_tags:'Manage tags', tag_manager:'Tags', untagged:'Untagged', color:'Color', custom:'Custom',
     spending_by_tag:'Spending by tag', tag_name_ph:'Tag name', by_category:'By category', by_tag:'By tag',
     new_category:'New category', category_name:'Category name', category_ph:'e.g. Subscriptions',
     new_group:'New category group', group_name:'Group name', group_ph:'e.g. Kids',
@@ -723,7 +731,7 @@ const I18N = {
     txn_added:'Dodano transakcję', edit_txn:'Edytuj transakcję', edit_transfer:'Edytuj przelew', transfer_edit_note:'Przelewy edytuj przez usunięcie i dodanie',
     split:'Podział', split_txn:'Podziel transakcję', add_line:'+ Dodaj wiersz', split_total:'Razem',
     split_over:n=>`Wiersze przekraczają sumę o ${n}`, split_balances:'Pierwszy wiersz dostosowuje się, aby wiersze zawsze sumowały się do całości',
-    tag:'Tag', tags:'Tagi', no_tag:'Bez tagu', new_tag:'Nowy tag', manage_tags:'Zarządzaj tagami', tag_manager:'Tagi', untagged:'Bez tagu',
+    tag:'Tag', tags:'Tagi', no_tag:'Bez tagu', new_tag:'Nowy tag', manage_tags:'Zarządzaj tagami', tag_manager:'Tagi', untagged:'Bez tagu', color:'Kolor', custom:'Własny',
     spending_by_tag:'Wydatki wg tagu', tag_name_ph:'Nazwa tagu', by_category:'Wg kategorii', by_tag:'Wg tagu',
     new_category:'Nowa kategoria', category_name:'Nazwa kategorii', category_ph:'np. Subskrypcje',
     new_group:'Nowa grupa kategorii', group_name:'Nazwa grupy', group_ph:'np. Dzieci',
@@ -934,6 +942,27 @@ function wireTagPicker(scope){
     };
   });
 }
+// color picker popover: preset swatches + a native custom picker
+let colorPopOutside=null;
+function closeColorPop(){ const p=document.getElementById('colorPop'); if(p) p.remove(); if(colorPopOutside){ document.removeEventListener('mousedown',colorPopOutside,true); colorPopOutside=null; } }
+function openColorPop(anchor, current, onPick){
+  closeColorPop();
+  const cur=(current||'').toLowerCase();
+  const pop=document.createElement('div'); pop.id='colorPop'; pop.className='color-pop';
+  pop.innerHTML=TAG_COLORS.map(c=>`<button type="button" class="cp-dot ${c.toLowerCase()===cur?'on':''}" data-c="${c}" style="background:${c}"></button>`).join('')
+    +`<label class="cp-custom" title="${T('custom')}"><input type="color" value="${/^#[0-9a-f]{6}$/i.test(current)?current:'#3b82f6'}"></label>`;
+  document.body.append(pop);
+  const r=anchor.getBoundingClientRect(), pw=pop.offsetWidth, ph=pop.offsetHeight;
+  let left=r.left; if(left+pw>window.innerWidth-8) left=window.innerWidth-8-pw;
+  let top=r.bottom+6; if(top+ph>window.innerHeight-8) top=r.top-ph-6;
+  pop.style.left=Math.max(8,left)+'px'; pop.style.top=Math.max(8,top)+'px';
+  pop.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{ onPick(b.dataset.c); closeColorPop(); });
+  const ci=pop.querySelector('input[type=color]');
+  ci.oninput=()=>onPick(ci.value);                       // live while dragging
+  ci.onchange=()=>{ onPick(ci.value); closeColorPop(); };
+  colorPopOutside=e=>{ if(!pop.contains(e.target)) closeColorPop(); };
+  setTimeout(()=>document.addEventListener('mousedown',colorPopOutside,true),0);
+}
 // Tag manager: add / rename / recolor / disable / delete(if unused)
 function openTagManager(){
   const rows=(state.tags||[]).map(t=>{ const used=tagTxnCount(t.id);
@@ -954,7 +983,8 @@ function openTagManager(){
   modalHost.querySelectorAll('.tgm-name').forEach(inp=>inp.onchange=()=>{ const t=tagById(inp.dataset.id); if(t){ const v=inp.value.trim(); if(v){t.name=v;save();} else inp.value=t.name; } });
   modalHost.querySelectorAll('[data-arch]').forEach(b=>b.onclick=()=>{ const t=tagById(b.dataset.arch); if(t){ t.archived=!t.archived; save(); rerender(); } });
   modalHost.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(b.disabled) return; state.tags=state.tags.filter(x=>x.id!==b.dataset.del); save(); rerender(); });
-  modalHost.querySelectorAll('[data-sw]').forEach(b=>b.onclick=()=>{ const t=tagById(b.dataset.sw); if(!t) return; const i=TAG_COLORS.indexOf(t.color); t.color=TAG_COLORS[(i+1)%TAG_COLORS.length]; save(); rerender(); });
+  modalHost.querySelectorAll('[data-sw]').forEach(b=>b.onclick=()=>{ const t=tagById(b.dataset.sw); if(!t) return;
+    openColorPop(b, t.color, c=>{ t.color=c; b.style.background=c; save(); }); });   // update swatch live, no full rerender
   const add=()=>{ const v=modalHost.querySelector('#tgmNew').value.trim(); if(v){ addTag(v); rerender(); } };
   modalHost.querySelector('#tgmAdd').onclick=add;
   modalHost.querySelector('#tgmNew').onkeydown=e=>{ if(e.key==='Enter') add(); };
@@ -1634,16 +1664,17 @@ function accountsView(){
         seenSplit.add(t.splitId);
         const grp=state.transactions.filter(x=>x.splitId===t.splitId);
         const sum=grp.reduce((s,x)=>s+x.amount,0);
-        const names=grp.map(x=>x.categoryId?(catById(x.categoryId)?catById(x.categoryId).name:'—'):T('pill_uncat')).join(' · ');
         const an=state.accounts.find(a=>a.id===t.accountId);
         const tagIds=[...new Set(grp.map(x=>x.tagId||''))];
-        const sharedTag=(tagIds.length===1&&tagIds[0])?tagBadge(tagIds[0]):'';   // show a tag only if all lines share it
+        const sharedTag=(tagIds.length===1&&tagIds[0])?tagBadge(tagIds[0]):'';   // a tag only if all lines share it
+        const notes=[...new Set(grp.map(x=>x.memo||''))];
+        const sharedNote=(notes.length===1&&notes[0])?notes[0]:'';               // a note only if identical on every line
         return `<tr data-txnrow="${t.id}">
           <td>${t.date}</td>
           ${acct?'':`<td style="color:var(--ink-soft)">${an?escapeHtml(an.name):''}</td>`}
-          <td>${escapeHtml(t.payee)} ${sharedTag}</td>
-          <td><span class="pill-cat split">⧉ ${T('split')} (${grp.length})</span><div class="spl-breakdown">${escapeHtml(names)}</div></td>
-          <td class="txn-note-cell">${t.memo?escapeHtml(t.memo):''}</td>
+          <td>${escapeHtml(t.payee)}</td>
+          <td><span class="pill-cat split clickable" data-splitedit="${t.id}" title="${T('edit')}">⧉ ${T('split')}</span></td>
+          <td class="txn-note-cell">${sharedTag}${sharedNote?`<span class="txn-note-txt">${escapeHtml(sharedNote)}</span>`:''}</td>
           <td class="amt ${sum>0?'in':''}">${fmt(sum)}</td>
           ${acts(t.id)}</tr>`;
       }
@@ -1667,9 +1698,9 @@ function accountsView(){
       return `<tr data-txnrow="${t.id}">
         <td>${t.date}</td>
         ${acct?'':`<td style="color:var(--ink-soft)">${an?escapeHtml(an.name):''}</td>`}
-        <td>${escapeHtml(t.payee)} ${tagBadge(t.tagId)}</td>
+        <td>${escapeHtml(t.payee)}</td>
         <td>${cat}</td>
-        <td class="txn-note-cell">${t.memo?escapeHtml(t.memo):''}</td>
+        <td class="txn-note-cell">${tagBadge(t.tagId)}${t.memo?`<span class="txn-note-txt">${escapeHtml(t.memo)}</span>`:''}</td>
         <td class="amt ${t.amount>0?'in':''}">${fmt(t.amount)}</td>
         ${editable?acts(t.id):`<td class="txn-actions"><button class="tx-del" data-txdel="${t.id}" title="${T('delete')}">✕</button></td>`}</tr>`;
     }).join(''); })()||`<tr><td colspan="${acct?6:7}" style="text-align:center;color:var(--ink-soft);padding:30px">${T('no_txn_month')}</td></tr>`}
@@ -1678,6 +1709,7 @@ function accountsView(){
   wrap.querySelector('#acctChooser').onchange=e=>{ui.selAcct=e.target.value;ui.acctSheet=false;render();};
   const adBtn=wrap.querySelector('#acctDetailsBtn'); if(adBtn) adBtn.onclick=()=>{ui.acctSheet=true;render();};
   wrap.querySelectorAll('[data-txedit]').forEach(b=>b.onclick=()=>openEditTxn(b.dataset.txedit));
+  wrap.querySelectorAll('[data-splitedit]').forEach(el=>el.onclick=e=>{ e.stopPropagation(); openEditTxn(el.dataset.splitedit); });
   wrap.querySelectorAll('[data-txdel]').forEach(b=>b.onclick=()=>{ if(confirm(T('del_txn_confirm'))) deleteTransaction(b.dataset.txdel); });
   wrap.querySelectorAll('[data-txnrow]').forEach(tr=>tr.onclick=e=>{        // mobile: tap a row to edit (actions column is hidden)
     if(!window.matchMedia('(max-width:768px)').matches) return;
@@ -2240,17 +2272,21 @@ function openSplitEditor(opts){
     const built=lines.map((ln,i)=>({cid:ln.categoryId, amt:i===0?bal:parseAmt(ln.amount), note:(ln.note||'').trim(), tagId:ln.tagId||null})).filter(l=>l.amt>0);
     if(!built.length){ toast(T('enter_amount')); return; }
     const d=$('#splDate').value, acc=$('#splAcct').value, py=$('#txPayee').value.trim()||T('unnamed');
+    // preserve the original ordering position on edit/convert (don't bump to the top of the day)
+    const origSeq = splitId ? Math.min(...state.transactions.filter(t=>t.splitId===splitId).map(t=>t.seq||0))
+                  : replaceId ? ((state.transactions.find(t=>t.id===replaceId)||{}).seq) : null;
+    const seqFor = ()=> origSeq!=null ? origSeq : nextSeq();
     if(splitId) state.transactions=state.transactions.filter(t=>t.splitId!==splitId);   // replace existing lines
     if(replaceId) state.transactions=state.transactions.filter(t=>t.id!==replaceId);     // converting a normal txn → split
     const mkCid=cid=> type==='in' ? (cid||RTA()) : cid;
     if(built.length===1){                                                                // degenerate split → normal txn
       const cid=mkCid(built[0].cid);
-      state.transactions.push({id:uid('t'),seq:nextSeq(),date:d,accountId:acc,payee:py,categoryId:cid,tagId:built[0].tagId,amount:type==='in'?built[0].amt:-built[0].amt,memo:built[0].note,cleared:false});
+      state.transactions.push({id:uid('t'),seq:seqFor(),date:d,accountId:acc,payee:py,categoryId:cid,tagId:built[0].tagId,amount:type==='in'?built[0].amt:-built[0].amt,memo:built[0].note,cleared:false});
       rememberPayee(cid,py);
     } else {
       const sid=splitId||uid('spl');
       built.forEach(ln=>{ const cid=mkCid(ln.cid);
-        state.transactions.push({id:uid('t'),seq:nextSeq(),date:d,accountId:acc,payee:py,categoryId:cid,tagId:ln.tagId,amount:type==='in'?ln.amt:-ln.amt,memo:ln.note,cleared:false,splitId:sid});
+        state.transactions.push({id:uid('t'),seq:seqFor(),date:d,accountId:acc,payee:py,categoryId:cid,tagId:ln.tagId,amount:type==='in'?ln.amt:-ln.amt,memo:ln.note,cleared:false,splitId:sid});
         rememberPayee(cid,py); });
     }
     closeModal(); toast(T('changes_saved')); render();
