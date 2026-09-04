@@ -347,10 +347,14 @@
   .spl-line .spl-cat{flex:1;min-width:0;}
   .spl-line .spl-amt{width:110px;flex:0 0 auto;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm);outline:none;font-size:.95rem;text-align:right;font-variant-numeric:tabular-nums;}
   .spl-line .spl-amt:focus{border-color:var(--accent);}
+  .spl-line .spl-amt.balancer{background:var(--surface-2);font-weight:700;color:var(--ink);cursor:default;}
+  .spl-line .spl-amt.neg{color:var(--red);border-color:var(--red);}
+  .spl-note{width:100%;margin-top:6px;padding:6px 10px;border:1px solid var(--line);border-radius:var(--r-sm);outline:none;font-size:.82rem;}
+  .spl-note:focus{border-color:var(--accent);}
   .spl-del-line{flex:0 0 auto;width:30px;height:30px;border-radius:var(--r-sm);color:var(--ink-soft);font-size:.9rem;}
   .spl-del-line:hover:not(:disabled){background:var(--red-bg);color:var(--red);}
-  .spl-del-line:disabled{opacity:.3;cursor:not-allowed;}
-  .spl-total-row{display:flex;justify-content:space-between;align-items:center;padding:8px 2px 2px;font-size:.92rem;border-top:1px solid var(--line);margin-top:4px;}
+  .spl-del-sp{flex:0 0 auto;width:30px;}
+  .spl-warn{color:var(--red);font-size:.8rem;margin-top:6px;font-weight:600;}
   /* Ready-to-Assign breakdown modal */
   .rb-sec-h{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);font-weight:700;margin:4px 0 2px;}
   .rb-sub{font-size:.72rem;color:var(--ink-soft);margin:10px 0 0;}
@@ -648,6 +652,7 @@ const I18N = {
     payee_ph:'e.g. Grocery store', unnamed:'(unnamed)', diff_places:'Choose two different places', transfer_done:'Transfer complete',
     txn_added:'Transaction added', edit_txn:'Edit transaction', edit_transfer:'Edit transfer', transfer_edit_note:'Edit transfers by deleting and re-adding',
     split:'Split', split_txn:'Split transaction', add_line:'+ Add line', split_total:'Total',
+    split_over:n=>`Lines exceed the total by ${n}`, split_balances:'The first row auto-adjusts so the lines always match the total',
     tag:'Tag', tags:'Tags', no_tag:'No tag', new_tag:'New tag', manage_tags:'Manage tags', tag_manager:'Tags', untagged:'Untagged',
     spending_by_tag:'Spending by tag', tag_name_ph:'Tag name', by_category:'By category', by_tag:'By tag',
     new_category:'New category', category_name:'Category name', category_ph:'e.g. Subscriptions',
@@ -717,6 +722,7 @@ const I18N = {
     payee_ph:'np. Biedronka', unnamed:'(bez nazwy)', diff_places:'Wybierz różne miejsca', transfer_done:'Przelew wykonany',
     txn_added:'Dodano transakcję', edit_txn:'Edytuj transakcję', edit_transfer:'Edytuj przelew', transfer_edit_note:'Przelewy edytuj przez usunięcie i dodanie',
     split:'Podział', split_txn:'Podziel transakcję', add_line:'+ Dodaj wiersz', split_total:'Razem',
+    split_over:n=>`Wiersze przekraczają sumę o ${n}`, split_balances:'Pierwszy wiersz dostosowuje się, aby wiersze zawsze sumowały się do całości',
     tag:'Tag', tags:'Tagi', no_tag:'Bez tagu', new_tag:'Nowy tag', manage_tags:'Zarządzaj tagami', tag_manager:'Tagi', untagged:'Bez tagu',
     spending_by_tag:'Wydatki wg tagu', tag_name_ph:'Nazwa tagu', by_category:'Wg kategorii', by_tag:'Wg tagu',
     new_category:'Nowa kategoria', category_name:'Nazwa kategorii', category_ph:'np. Subskrypcje',
@@ -2153,28 +2159,32 @@ function openSplitEditor(opts){
   let type = opts.type || 'out';
   const splitId = opts.splitId || null;
   const replaceId = opts.replaceId || null;
-  let acctId, date, payee, note, lines;
-  const grosz=g=>g?(Math.abs(g)/100).toFixed(2).replace('.',','):'';
+  let acctId, date, payee, lines, totalGr;
+  const grosz=g=>((Math.abs(g)||0)/100).toFixed(2).replace('.',',');
   if(splitId){
     const grp = state.transactions.filter(t=>t.splitId===splitId).sort((a,b)=>(a.seq||0)-(b.seq||0));
     const first=grp[0]||{};
     type = (first.categoryId===RTA()||isIncomeCat(first.categoryId)) ? 'in':'out';
-    acctId=first.accountId; date=first.date; payee=first.payee||''; note=first.memo||'';
-    lines = grp.map(l=>({categoryId:l.categoryId===RTA()?'':l.categoryId, amount:grosz(l.amount), tagId:l.tagId||''}));
+    acctId=first.accountId; date=first.date; payee=first.payee||'';
+    totalGr = grp.reduce((s,l)=>s+Math.abs(l.amount),0);
+    lines = grp.map(l=>({categoryId:l.categoryId===RTA()?'':l.categoryId, amount:grosz(l.amount), note:l.memo||'', tagId:l.tagId||''}));
   } else {
     acctId=opts.accountId||((state.accounts.find(a=>a.onBudget)||{}).id||'');
-    date=opts.date||todayISO(); payee=opts.payee||''; note=opts.note||'';
-    lines=[{categoryId:opts.categoryId||'', amount:opts.amount?grosz(opts.amount):'', tagId:opts.tagId||''}, {categoryId:'', amount:'', tagId:''}];
+    date=opts.date||todayISO(); payee=opts.payee||''; totalGr=opts.amount||0;
+    lines=[{categoryId:opts.categoryId||'', amount:'', note:opts.note||'', tagId:opts.tagId||''}];  // one balancer line = the whole total
   }
   openModal(`<div class="modal"><div class="modal-h"><h3>${T('split_txn')}</h3><button class="x" data-close>×</button></div>
     <div class="modal-b">
       <div class="seg"><button id="segOut">${T('expense')}</button><button id="segIn">${T('income')}</button></div>
-      <div class="field"><label>${T('account')}</label><select id="splAcct">${state.accounts.map(a=>`<option value="${a.id}" ${acctId===a.id?'selected':''}>${a.name}</option>`).join('')}</select></div>
-      <div class="field"><label>${T('date')}</label><input id="splDate" type="date" value="${date}"></div>
+      <div class="row2">
+        <div class="field"><label>${T('account')}</label><select id="splAcct">${state.accounts.map(a=>`<option value="${a.id}" ${acctId===a.id?'selected':''}>${a.name}</option>`).join('')}</select></div>
+        <div class="field"><label>${T('date')}</label><input id="splDate" type="date" value="${date}"></div>
+      </div>
+      <div class="field"><label>${T('split_total')}</label><input id="splTotalInp" type="text" placeholder="0,00" value="${totalGr?grosz(totalGr):''}"></div>
       <div class="field"><label>${T('category')}</label><div id="splitLines"></div>
-        <button class="mini-btn ghost" id="splAdd" style="margin-top:6px">${T('add_line')}</button></div>
-      <div class="spl-total-row"><span>${T('split_total')}</span><b id="splTotal">—</b></div>
-      <div class="field"><label>${T('note')}</label><input id="splNote" type="text" placeholder="${T('note_ph')}" value="${(note||'').replace(/"/g,'&quot;')}"></div>
+        <button class="mini-btn ghost" id="splAdd" style="margin-top:6px">${T('add_line')}</button>
+        <div class="tgt-txt" style="margin-top:6px">${T('split_balances')}</div>
+        <div class="spl-warn" id="splWarn" style="display:none"></div></div>
       <div class="field"><label>${T('payee')}</label>
         <div class="payee-combo"><input id="txPayee" type="text" autocomplete="off" value="${(payee||'').replace(/"/g,'&quot;')}" placeholder="${T('payee_ph')}"><div class="cc-list"></div></div></div>
     </div>
@@ -2182,51 +2192,65 @@ function openSplitEditor(opts){
       ${(splitId||replaceId)?`<button class="mini-btn" id="splDel" style="background:none;color:var(--red);width:auto;margin:0 auto 0 0;padding:8px 2px">${T('delete')}</button>`:''}
       <button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="splSave">${T('save')}</button></div></div>`);
   const $=s=>modalHost.querySelector(s);
+  // line 0 is the balancer: its amount = total − sum(other lines), auto-adjusted and read-only
   const lineHTML=(ln,i)=>`<div class="spl-line" data-i="${i}">
       <div class="spl-line-main">
         <div class="spl-cat">${catComboHTML('splCat'+i, ln.categoryId)}</div>
-        <input class="spl-amt" data-i="${i}" type="text" placeholder="0,00" value="${ln.amount||''}">
-        <button class="spl-del-line" data-i="${i}" title="${T('delete')}" ${lines.length<=1?'disabled':''}>✕</button>
+        <input class="spl-amt ${i===0?'balancer':''}" data-i="${i}" type="text" placeholder="0,00" value="${i===0?'':(ln.amount||'')}" ${i===0?'readonly title="'+T('split_balances')+'"':''}>
+        ${i===0?'<span class="spl-del-sp"></span>':`<button class="spl-del-line" data-i="${i}" title="${T('delete')}">✕</button>`}
       </div>
+      <input class="spl-note" data-i="${i}" type="text" placeholder="${T('note_ph')}" value="${(ln.note||'').replace(/"/g,'&quot;')}">
       <div class="spl-line-tag">${tagPickerHTML('splTag'+i, ln.tagId||'')}</div>
     </div>`;
   const syncFromDOM=()=>modalHost.querySelectorAll('.spl-line').forEach(row=>{ const i=+row.dataset.i;
     lines[i].categoryId=row.querySelector('.spl-cat input[type=hidden]').value;
     lines[i].tagId=row.querySelector('.spl-line-tag input[type=hidden]').value;
-    lines[i].amount=row.querySelector('.spl-amt').value; });
-  const total=()=>lines.reduce((s,ln)=>s+parseAmt(ln.amount),0);
-  const updateTotal=()=>{ const t=total(); $('#splTotal').textContent=fmt(type==='in'?t:-t); };
+    lines[i].note=row.querySelector('.spl-note').value;
+    if(i>0) lines[i].amount=row.querySelector('.spl-amt').value; });   // line 0 amount is derived, don't read it
+  const others=()=>lines.reduce((s,ln,i)=>i>0?s+parseAmt(ln.amount):s, 0);
+  const balancer=()=>totalGr - others();
+  const updateBalancer=()=>{
+    const bal=balancer();
+    const b=modalHost.querySelector('.spl-amt.balancer');
+    if(b){ b.value=(bal/100).toFixed(2).replace('.',','); b.classList.toggle('neg', bal<0); }
+    const w=$('#splWarn'); w.style.display = bal<0 ? 'block':'none'; w.textContent = bal<0 ? T('split_over', fmt(-bal)) : '';
+    $('#splSave').disabled = bal<0;
+  };
   const renderLines=()=>{
     $('#splitLines').innerHTML=lines.map(lineHTML).join('');
     wireCatCombos($('#splitLines'), ()=> allCats(type==='in'?incomeRoot():state.groups));
     wireTagPicker($('#splitLines'));
-    $('#splitLines').querySelectorAll('.spl-amt').forEach(inp=>inp.oninput=()=>{ syncFromDOM(); updateTotal(); });
-    $('#splitLines').querySelectorAll('.spl-del-line').forEach(b=>b.onclick=()=>{ syncFromDOM(); if(lines.length>1){ lines.splice(+b.dataset.i,1); renderLines(); } });
-    updateTotal();
+    $('#splitLines').querySelectorAll('.spl-amt:not(.balancer)').forEach(inp=>inp.oninput=()=>{ syncFromDOM(); updateBalancer(); });
+    $('#splitLines').querySelectorAll('.spl-del-line').forEach(b=>b.onclick=()=>{ syncFromDOM(); lines.splice(+b.dataset.i,1); renderLines(); });
+    updateBalancer();
   };
   renderLines();
   wirePayeeCombo(modalHost, ()=> (lines[0]&&lines[0].categoryId)||'');
-  $('#splAdd').onclick=()=>{ syncFromDOM(); lines.push({categoryId:'',amount:''}); renderLines(); };
+  $('#splTotalInp').oninput=()=>{ totalGr=parseAmt($('#splTotalInp').value); updateBalancer(); };
+  $('#splAdd').onclick=()=>{ syncFromDOM(); lines.push({categoryId:'',amount:'',note:'',tagId:''}); renderLines(); };
   const setSeg=k=>{ if(k===type) return; type=k; $('#segOut').classList.toggle('on',k==='out'); $('#segIn').classList.toggle('on',k==='in');
     syncFromDOM(); lines.forEach(ln=>ln.categoryId=''); renderLines(); };   // switching trees resets categories
   $('#segOut').classList.toggle('on',type==='out'); $('#segIn').classList.toggle('on',type==='in');
   $('#segOut').onclick=()=>setSeg('out'); $('#segIn').onclick=()=>setSeg('in');
   $('#splSave').onclick=()=>{
+    if($('#splSave').disabled) return;
     syncFromDOM();
-    const valid=lines.map(ln=>({cid:ln.categoryId, amt:parseAmt(ln.amount), tagId:ln.tagId||null})).filter(ln=>ln.amt>0);
-    if(!valid.length){ toast(T('enter_amount')); return; }
-    const d=$('#splDate').value, acc=$('#splAcct').value, py=$('#txPayee').value.trim()||T('unnamed'), nt=$('#splNote').value.trim();
+    const bal=balancer(); if(bal<0){ toast(T('split_over', fmt(-bal))); return; }
+    // build final lines: line 0 gets the balancer amount, the rest their typed amounts
+    const built=lines.map((ln,i)=>({cid:ln.categoryId, amt:i===0?bal:parseAmt(ln.amount), note:(ln.note||'').trim(), tagId:ln.tagId||null})).filter(l=>l.amt>0);
+    if(!built.length){ toast(T('enter_amount')); return; }
+    const d=$('#splDate').value, acc=$('#splAcct').value, py=$('#txPayee').value.trim()||T('unnamed');
     if(splitId) state.transactions=state.transactions.filter(t=>t.splitId!==splitId);   // replace existing lines
     if(replaceId) state.transactions=state.transactions.filter(t=>t.id!==replaceId);     // converting a normal txn → split
     const mkCid=cid=> type==='in' ? (cid||RTA()) : cid;
-    if(valid.length===1){                                                                // degenerate split → normal txn
-      const cid=mkCid(valid[0].cid);
-      state.transactions.push({id:uid('t'),seq:nextSeq(),date:d,accountId:acc,payee:py,categoryId:cid,tagId:valid[0].tagId,amount:type==='in'?valid[0].amt:-valid[0].amt,memo:nt,cleared:false});
+    if(built.length===1){                                                                // degenerate split → normal txn
+      const cid=mkCid(built[0].cid);
+      state.transactions.push({id:uid('t'),seq:nextSeq(),date:d,accountId:acc,payee:py,categoryId:cid,tagId:built[0].tagId,amount:type==='in'?built[0].amt:-built[0].amt,memo:built[0].note,cleared:false});
       rememberPayee(cid,py);
     } else {
       const sid=splitId||uid('spl');
-      valid.forEach(ln=>{ const cid=mkCid(ln.cid);
-        state.transactions.push({id:uid('t'),seq:nextSeq(),date:d,accountId:acc,payee:py,categoryId:cid,tagId:ln.tagId,amount:type==='in'?ln.amt:-ln.amt,memo:nt,cleared:false,splitId:sid});
+      built.forEach(ln=>{ const cid=mkCid(ln.cid);
+        state.transactions.push({id:uid('t'),seq:nextSeq(),date:d,accountId:acc,payee:py,categoryId:cid,tagId:ln.tagId,amount:type==='in'?ln.amt:-ln.amt,memo:ln.note,cleared:false,splitId:sid});
         rememberPayee(cid,py); });
     }
     closeModal(); toast(T('changes_saved')); render();
