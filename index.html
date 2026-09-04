@@ -348,6 +348,9 @@
   .cp-dot.on{outline:2px solid var(--ink);outline-offset:1px;}
   .cp-custom{width:24px;height:24px;border-radius:50%;cursor:pointer;overflow:hidden;position:relative;background:conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red);border:2px solid #fff;box-shadow:var(--sh-1);}
   .cp-custom input[type=color]{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;border:none;padding:0;}
+  /* default-tag chooser popover */
+  .tag-choose-pop{position:fixed;z-index:70;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--sh-3);padding:8px;display:flex;flex-direction:column;gap:6px;align-items:flex-start;min-width:150px;max-height:50vh;overflow:auto;}
+  .tag-choose-pop .tag-chip{width:100%;text-align:left;}
   /* split editor lines */
   .spl-line{margin-bottom:12px;padding-bottom:10px;border-bottom:1px dashed var(--line);}
   .spl-line-main{display:flex;gap:8px;align-items:center;}
@@ -661,7 +664,7 @@ const I18N = {
     txn_added:'Transaction added', edit_txn:'Edit transaction', edit_transfer:'Edit transfer', transfer_edit_note:'Edit transfers by deleting and re-adding',
     split:'Split', split_txn:'Split transaction', add_line:'+ Add line', split_total:'Total',
     split_over:n=>`Lines exceed the total by ${n}`, split_balances:'The first row auto-adjusts so the lines always match the total',
-    tag:'Tag', tags:'Tags', no_tag:'No tag', new_tag:'New tag', manage_tags:'Manage tags', tag_manager:'Tags', untagged:'Untagged', color:'Color', custom:'Custom',
+    tag:'Tag', tags:'Tags', no_tag:'No tag', new_tag:'New tag', manage_tags:'Manage tags', tag_manager:'Tags', untagged:'Untagged', color:'Color', custom:'Custom', default_tag:'Default tag',
     spending_by_tag:'Spending by tag', tag_name_ph:'Tag name', by_category:'By category', by_tag:'By tag',
     new_category:'New category', category_name:'Category name', category_ph:'e.g. Subscriptions',
     new_group:'New category group', group_name:'Group name', group_ph:'e.g. Kids',
@@ -731,7 +734,7 @@ const I18N = {
     txn_added:'Dodano transakcję', edit_txn:'Edytuj transakcję', edit_transfer:'Edytuj przelew', transfer_edit_note:'Przelewy edytuj przez usunięcie i dodanie',
     split:'Podział', split_txn:'Podziel transakcję', add_line:'+ Dodaj wiersz', split_total:'Razem',
     split_over:n=>`Wiersze przekraczają sumę o ${n}`, split_balances:'Pierwszy wiersz dostosowuje się, aby wiersze zawsze sumowały się do całości',
-    tag:'Tag', tags:'Tagi', no_tag:'Bez tagu', new_tag:'Nowy tag', manage_tags:'Zarządzaj tagami', tag_manager:'Tagi', untagged:'Bez tagu', color:'Kolor', custom:'Własny',
+    tag:'Tag', tags:'Tagi', no_tag:'Bez tagu', new_tag:'Nowy tag', manage_tags:'Zarządzaj tagami', tag_manager:'Tagi', untagged:'Bez tagu', color:'Kolor', custom:'Własny', default_tag:'Domyślny tag',
     spending_by_tag:'Wydatki wg tagu', tag_name_ph:'Nazwa tagu', by_category:'Wg kategorii', by_tag:'Wg tagu',
     new_category:'Nowa kategoria', category_name:'Nazwa kategorii', category_ph:'np. Subskrypcje',
     new_group:'Nowa grupa kategorii', group_name:'Nazwa grupy', group_ph:'np. Dzieci',
@@ -931,12 +934,12 @@ function wireTagPicker(scope){
   scope.querySelectorAll('.tag-pick').forEach(pick=>{
     const hidden=pick.querySelector('input[type=hidden]');
     const sel=()=>{ pick.querySelectorAll('.tag-chip[data-tag]').forEach(c=>c.classList.toggle('on',c.dataset.tag===hidden.value)); };
-    pick.querySelectorAll('.tag-chip[data-tag]').forEach(c=>c.onclick=()=>{ hidden.value = hidden.value===c.dataset.tag ? '' : c.dataset.tag; sel(); });
+    pick.querySelectorAll('.tag-chip[data-tag]').forEach(c=>c.onclick=()=>{ hidden.value = hidden.value===c.dataset.tag ? '' : c.dataset.tag; hidden.dataset.auto=''; sel(); });
     const nb=pick.querySelector('.tag-new');
     nb.onclick=()=>{
       const inp=document.createElement('input'); inp.className='tag-new-input'; inp.placeholder=T('tag_name_ph');
       nb.replaceWith(inp); inp.focus();
-      const commit=()=>{ const v=inp.value.trim(); if(v){ const t=addTag(v); const btn=document.createElement('button'); btn.type='button'; btn.className='tag-chip on'; btn.dataset.tag=t.id; btn.style.setProperty('--tc',t.color); btn.textContent=t.name; btn.onclick=()=>{ hidden.value=hidden.value===t.id?'':t.id; sel(); }; inp.replaceWith(btn); hidden.value=t.id; sel(); const nn=document.createElement('button'); nn.type='button'; nn.className='tag-chip tag-new'; nn.title=T('new_tag'); nn.textContent='＋'; btn.after(nn); wireTagPicker(pick.parentElement); } else inp.remove(); };
+      const commit=()=>{ const v=inp.value.trim(); if(v){ const t=addTag(v); const btn=document.createElement('button'); btn.type='button'; btn.className='tag-chip on'; btn.dataset.tag=t.id; btn.style.setProperty('--tc',t.color); btn.textContent=t.name; btn.onclick=()=>{ hidden.value=hidden.value===t.id?'':t.id; hidden.dataset.auto=''; sel(); }; inp.replaceWith(btn); hidden.value=t.id; hidden.dataset.auto=''; sel(); const nn=document.createElement('button'); nn.type='button'; nn.className='tag-chip tag-new'; nn.title=T('new_tag'); nn.textContent='＋'; btn.after(nn); wireTagPicker(pick.parentElement); } else inp.remove(); };
       inp.onkeydown=e=>{ if(e.key==='Enter'){e.preventDefault();commit();} else if(e.key==='Escape'){ const nn=document.createElement('button'); nn.type='button'; nn.className='tag-chip tag-new'; nn.title=T('new_tag'); nn.textContent='＋'; inp.replaceWith(nn); wireTagPicker(pick.parentElement); } };
       inp.onblur=commit;
     };
@@ -960,6 +963,22 @@ function openColorPop(anchor, current, onPick){
   const ci=pop.querySelector('input[type=color]');
   ci.oninput=()=>onPick(ci.value);                       // live while dragging
   ci.onchange=()=>{ onPick(ci.value); closeColorPop(); };
+  colorPopOutside=e=>{ if(!pop.contains(e.target)) closeColorPop(); };
+  setTimeout(()=>document.addEventListener('mousedown',colorPopOutside,true),0);
+}
+// choose a category's default tag (None + existing tags) — reuses the colorPop close machinery
+function openDefTagPop(anchor, node){
+  closeColorPop();
+  const cur=node.defaultTagId||'';
+  const pop=document.createElement('div'); pop.id='colorPop'; pop.className='tag-choose-pop';
+  pop.innerHTML=`<button type="button" class="tag-chip ${!cur?'on':''}" data-tag="">${T('no_tag')}</button>`
+    +(state.tags||[]).filter(t=>!t.archived).map(t=>`<button type="button" class="tag-chip ${t.id===cur?'on':''}" data-tag="${t.id}" style="--tc:${t.color}">${escapeHtml(t.name)}</button>`).join('');
+  document.body.append(pop);
+  const r=anchor.getBoundingClientRect(), pw=pop.offsetWidth, ph=pop.offsetHeight;
+  let left=r.right-pw; if(left<8) left=8;
+  let top=r.bottom+6; if(top+ph>window.innerHeight-8) top=Math.max(8,r.top-ph-6);
+  pop.style.left=left+'px'; pop.style.top=top+'px';
+  pop.querySelectorAll('[data-tag]').forEach(b=>b.onclick=()=>{ if(b.dataset.tag) node.defaultTagId=b.dataset.tag; else delete node.defaultTagId; save(); closeColorPop(); render(); });
   colorPopOutside=e=>{ if(!pop.contains(e.target)) closeColorPop(); };
   setTimeout(()=>document.addEventListener('mousedown',colorPopOutside,true),0);
 }
@@ -1906,6 +1925,10 @@ function openCatMenu(btn, opts){
     items.push({label:T('add_group'), fn:()=>openAddGroup(kind)});
   } else {
     items.push({label:T('rename'), fn:()=>startRename(id)});
+    if((state.tags||[]).some(t=>!t.archived)){
+      const node=catById(id), dt=node&&node.defaultTagId?tagById(node.defaultTagId):null;
+      items.push({label:T('default_tag')+(dt&&!dt.archived?' · '+dt.name:''), fn:()=>{ if(node) openDefTagPop(btn,node); }});
+    }
     const info=catTxnInfo(id), hasTx=info.count>0;
     items.push({label:T('delete'), danger:true, disabled:hasTx, title:hasTx?T('cant_delete_txn',info.count,info.lastDate):'',
                 fn:()=>{ if(confirm(T('del_node_confirm'))) deleteCategory(id); }});
@@ -2010,6 +2033,41 @@ function wirePayeeCombo(scope, getCatId){
   inp.onfocus=draw; inp.oninput=draw;
   inp.onblur=()=>setTimeout(()=>list.classList.remove('show'),150);
 }
+// When a category has exactly one remembered payee, auto-fill the payee input on category select.
+// Only fills when empty or when the value was itself auto-filled (never clobbers what the user typed).
+function autofillPayee(catId, inp){
+  if(!inp) return;
+  const names=(catId && state.payees && state.payees[catId])||[];
+  if(names.length===1){
+    if(!inp.value.trim() || inp.dataset.auto==='1'){ inp.value=names[0]; inp.dataset.auto='1'; }
+  } else if(inp.dataset.auto==='1'){ inp.value=''; inp.dataset.auto=''; }   // clear a stale auto-fill when the new category isn't 1:1
+}
+// wire a category hidden input → payee auto-fill (call after wireCatCombos + wirePayeeCombo)
+function wirePayeeAutofill(catHidden, payeeInp){
+  if(!catHidden||!payeeInp) return;
+  catHidden.addEventListener('change', ()=>autofillPayee(catHidden.value, payeeInp));
+  payeeInp.addEventListener('input', ()=>{ payeeInp.dataset.auto=''; });   // user typing cancels the auto flag
+}
+// resolve a category's default tag, inheriting up the tree (node → parent category → section); skips missing/archived tags
+function categoryDefaultTag(catId){
+  let id=catId;
+  while(id){
+    const n=catById(id);
+    if(n && n.defaultTagId){ const tg=tagById(n.defaultTagId); if(tg && !tg.archived) return n.defaultTagId; }
+    const loc=catLoc(id); id = loc && loc.parent ? loc.parent.id : null;
+  }
+  return null;
+}
+// auto-select a tag in a chip picker from the category's default (overridable; never clobbers a manual choice)
+function autofillTag(catId, pick){
+  if(!pick) return;
+  const hidden=pick.querySelector('input[type=hidden]'); if(!hidden) return;
+  if(hidden.value && hidden.dataset.auto!=='1') return;              // user picked a tag — leave it
+  const def=categoryDefaultTag(catId)||'';
+  hidden.value=def; hidden.dataset.auto = def?'1':'';
+  pick.querySelectorAll('.tag-chip[data-tag]').forEach(c=>c.classList.toggle('on', c.dataset.tag===def));
+}
+function wireTagAutofill(catHidden, pick){ if(catHidden&&pick) catHidden.addEventListener('change', ()=>autofillTag(catHidden.value, pick)); }
 function wireCatCombos(scope, getNodes){
   const getN = getNodes || (()=>allCats());
   scope.querySelectorAll('.cc-input').forEach(inp=>{
@@ -2026,7 +2084,7 @@ function wireCatCombos(scope, getNodes){
       active=-1;
       list.querySelectorAll('.cc-opt').forEach(o=>o.onmousedown=e=>{ e.preventDefault(); pick(o.dataset.id); });
     };
-    const pick=id=>{ hidden.value=id; inp.value=nodePathById(id); list.classList.remove('show'); };
+    const pick=id=>{ hidden.value=id; inp.value=nodePathById(id); list.classList.remove('show'); hidden.dispatchEvent(new Event('change')); };
     inp.onfocus=()=>{ inp.select(); list.classList.add('show'); draw(''); };
     inp.oninput=()=>{ list.classList.add('show'); draw(inp.value); };
     inp.onblur=()=>{ setTimeout(()=>{ inp.value=selPath(); list.classList.remove('show'); },120); };
@@ -2067,7 +2125,9 @@ function openAddTxn(){
   let type='out';
   wireCatCombos(modalHost, ()=> allCats(type==='in'?incomeRoot():state.groups));
   wirePayeeCombo(modalHost, ()=> $('#txCat').value||'');
+  wirePayeeAutofill($('#txCat'), $('#txPayee'));
   wireTagPicker(modalHost);
+  wireTagAutofill($('#txCat'), $('#txTag').closest('.tag-pick'));
   const clearCat=()=>{ $('#txCat').value=''; const ci=modalHost.querySelector('.cc-input'); if(ci) ci.value=''; };
   const setSeg=t=>{ const prev=type; type=t;
     [['out','#segOut'],['in','#segIn'],['tr','#segTr']].forEach(([k,s])=>$(s).classList.toggle('on',k===t));
@@ -2134,7 +2194,9 @@ function openEditTxn(id){
   let type = (t.categoryId===RTA()||isIncomeCat(t.categoryId)) ? 'in' : 'out';
   wireCatCombos(modalHost, ()=> allCats(type==='in'?incomeRoot():state.groups));
   wirePayeeCombo(modalHost, ()=> $('#txCat').value||'');
+  wirePayeeAutofill($('#txCat'), $('#txPayee'));
   wireTagPicker(modalHost);
+  wireTagAutofill($('#txCat'), $('#txTag').closest('.tag-pick'));
   const clearCat=()=>{ $('#txCat').value=''; const ci=modalHost.querySelector('.cc-input'); if(ci) ci.value=''; };
   const setSeg=k=>{ const prev=type; type=k;
     $('#segOut').classList.toggle('on',k==='out'); $('#segIn').classList.toggle('on',k==='in');
@@ -2255,12 +2317,17 @@ function openSplitEditor(opts){
     $('#splitLines').innerHTML=lines.map(lineHTML).join('');
     wireCatCombos($('#splitLines'), ()=> allCats(type==='in'?incomeRoot():state.groups));
     wireTagPicker($('#splitLines'));
+    $('#splitLines').querySelectorAll('.spl-line').forEach(row=>{
+      const h=row.querySelector('.spl-cat input[type=hidden]'), tp=row.querySelector('.spl-line-tag .tag-pick');
+      h.addEventListener('change',()=>{ autofillPayee(h.value,$('#txPayee')); autofillTag(h.value, tp); });
+    });
     $('#splitLines').querySelectorAll('.spl-amt:not(.balancer)').forEach(inp=>inp.oninput=()=>{ syncFromDOM(); updateBalancer(); });
     $('#splitLines').querySelectorAll('.spl-del-line').forEach(b=>b.onclick=()=>{ syncFromDOM(); lines.splice(+b.dataset.i,1); renderLines(); });
     updateBalancer();
   };
   renderLines();
   wirePayeeCombo(modalHost, ()=> (lines[0]&&lines[0].categoryId)||'');
+  $('#txPayee').addEventListener('input', ()=>{ $('#txPayee').dataset.auto=''; });
   $('#splTotalInp').oninput=()=>{ totalGr=parseAmt($('#splTotalInp').value); updateBalancer(); };
   $('#splAdd').onclick=()=>{ syncFromDOM(); lines.push({categoryId:'',amount:'',note:'',tagId:''}); renderLines(); };
   const setSeg=k=>{ if(k===type) return; type=k; $('#segOut').classList.toggle('on',k==='out'); $('#segIn').classList.toggle('on',k==='in');
