@@ -185,6 +185,17 @@
   .assigned-cell input{width:96px;text-align:right;padding:5px 8px;border:1.5px solid var(--accent);border-radius:var(--r-sm);
     font-weight:600;font-variant-numeric:tabular-nums;outline:none;}
   .activity-cell{color:var(--ink-soft);font-weight:500;font-size:.88rem;}
+  /* income planning table: 5 columns (Source · Target · Due · Actual · Status) */
+  .btable.income .brow-h, .btable.income .cg-head, .btable.income .cat-row{grid-template-columns:1fr 116px 130px 116px 150px;}
+  .due-cell{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .due-cell .due-day{font-size:.8rem;color:var(--ink-soft);font-variant-numeric:tabular-nums;}
+  .stat-badge{display:inline-block;padding:2px 9px;border-radius:var(--r-pill);font-size:.7rem;font-weight:700;white-space:nowrap;}
+  .stat-badge.due{background:#e9eefb;color:#3455b5;}
+  .stat-badge.pastdue,.stat-badge.less{background:var(--yellow-bg);color:var(--yellow);}
+  .stat-badge.overdue{background:var(--red-bg);color:var(--red);}
+  .stat-badge.paid,.stat-badge.as,.stat-badge.more{background:var(--green-bg);color:var(--green);}
+  .stat-badge.awaited{background:var(--grey-bg);color:var(--grey-fg);}
+  .chk-row{display:flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer;margin-top:4px;}
   .avail-pill{display:inline-block;padding:5px 11px;border-radius:var(--r-pill);font-weight:700;font-size:.86rem;
     font-variant-numeric:tabular-nums;min-width:78px;text-align:center;}
   .avail-pill.pos{background:var(--green-bg);color:var(--green);}
@@ -688,7 +699,13 @@ const I18N = {
     enable:'Enable', disable:'Disable', disabled_label:'disabled', expand_all:'Expand all', collapse_all:'Collapse all',
     cat_root:'Categories', add_group:'Add Group', add_cat_full:'Add Category', add_sub_full:'Add Subcategory', actions:'Actions',
     cant_delete_txn:(n,d)=>`Can't delete — ${n} transaction${n===1?'':'s'} logged here${d?` (last on ${d})`:''}. Disable it instead.`,
-    tab_spending:'Spending', tab_income:'Income', col_expected:'Expected', col_actual:'Actual', col_difference:'Difference', income_by_source:'Income by source'
+    tab_spending:'Spending', tab_income:'Income', col_expected:'Expected', col_actual:'Actual', col_difference:'Difference', income_by_source:'Income by source',
+    col_target:'Target', col_due:'Due', col_status:'Status',
+    st_due:'Due', st_pastdue:'Past due', st_overdue:'Overdue', st_paid:'Paid',
+    st_awaited:'Awaited', st_less:'Less than expected', st_as:'As expected', st_more:'More than expected',
+    income_target:'Income target', target_amount:'Target (zł)', due_day:'Due day', frequency:'Frequency',
+    freq_monthly:'Monthly', freq_yearly:'Yearly', freq_everyN:'Every N months', freq_once:'One-time',
+    every_n_label:'Every (months)', apply_future:'Apply to following months', no_due:'No due day', clear_target:'Clear target'
   },
   pl:{
     tagline:'Budżet domowy · PLN', ready_to_assign:'Do<br>przypisania', rta_tip:'Kliknij, aby zobaczyć szczegóły',
@@ -758,7 +775,13 @@ const I18N = {
     enable:'Włącz', disable:'Wyłącz', disabled_label:'wyłączona', expand_all:'Rozwiń wszystko', collapse_all:'Zwiń wszystko',
     cat_root:'Kategorie', add_group:'Dodaj grupę', add_cat_full:'Dodaj kategorię', add_sub_full:'Dodaj podkategorię', actions:'Akcje',
     cant_delete_txn:(n,d)=>`Nie można usunąć — zapisano tu ${n} transakcj${n===1?'ę':'i'}${d?` (ostatnia ${d})`:''}. Zamiast tego wyłącz.`,
-    tab_spending:'Wydatki', tab_income:'Przychody', col_expected:'Oczekiwane', col_actual:'Rzeczywiste', col_difference:'Różnica', income_by_source:'Przychody wg źródła'
+    tab_spending:'Wydatki', tab_income:'Przychody', col_expected:'Oczekiwane', col_actual:'Rzeczywiste', col_difference:'Różnica', income_by_source:'Przychody wg źródła',
+    col_target:'Cel', col_due:'Termin', col_status:'Status',
+    st_due:'Do zapłaty', st_pastdue:'Po terminie', st_overdue:'Zaległe', st_paid:'Otrzymano',
+    st_awaited:'Oczekiwane', st_less:'Mniej niż planowano', st_as:'Zgodnie z planem', st_more:'Więcej niż planowano',
+    income_target:'Cel przychodu', target_amount:'Cel (zł)', due_day:'Dzień terminu', frequency:'Częstotliwość',
+    freq_monthly:'Co miesiąc', freq_yearly:'Co rok', freq_everyN:'Co N miesięcy', freq_once:'Jednorazowo',
+    every_n_label:'Co (miesięcy)', apply_future:'Zastosuj do kolejnych miesięcy', no_due:'Brak terminu', clear_target:'Usuń cel'
   }
 };
 function T(k,...a){ let v=(I18N[LANG]&&I18N[LANG][k]); if(v==null) v=I18N.en[k]; if(v==null) return k; return typeof v==='function'?v(...a):v; }
@@ -908,8 +931,15 @@ function normalize(s){
       if(!s.payees[t.categoryId].includes(t.payee)) s.payees[t.categoryId].push(t.payee); });
   }
   if(!Array.isArray(s.incomeGroups)) s.incomeGroups=[];
-  if(!s.expected || typeof s.expected!=='object') s.expected={};
   if(!Array.isArray(s.tags)) s.tags=[];
+  if(!s.incomePlan||typeof s.incomePlan!=='object') s.incomePlan={};
+  if(!s.incomeOverride||typeof s.incomeOverride!=='object') s.incomeOverride={};
+  if(s.expected && typeof s.expected==='object'){    // migrate legacy per-month expected amounts → month overrides
+    for(const [m,obj] of Object.entries(s.expected)) for(const [cid,v] of Object.entries(obj)){
+      if(v){ (s.incomeOverride[m]=s.incomeOverride[m]||{}); if(!s.incomeOverride[m][cid]) s.incomeOverride[m][cid]={amount:v}; }
+    }
+    delete s.expected;
+  }
   return s;
 }
 // remembered payees per category
@@ -1111,8 +1141,52 @@ function activity(catId, mKey){
   return state.transactions.filter(t=>t.categoryId===catId && txnMonth(t)===mKey).reduce((s,t)=>s+t.amount,0);
 }
 function assigned(catId, mKey){ return (state.assignments[mKey]||{})[catId]||0; }
-// expected income for an income node within a month
-function expected(catId, mKey){ return (state.expected&&state.expected[mKey]||{})[catId]||0; }
+
+/* ---------- INCOME PLANNING (per-month target + due date + recurrence) ----------
+   Model: recurring effective-dated rules per category (state.incomePlan[catId]=[{from,amount,dueDay,freq,everyN}])
+   with single-month overrides (state.incomeOverride[month][catId]={amount,dueDay}|{off:true}). */
+function monthDiff(a,b){ const [ay,am]=a.split('-').map(Number),[by,bm]=b.split('-').map(Number); return (by-ay)*12+(bm-am); }
+function daysInMonth(m){ const [y,mo]=m.split('-').map(Number); return new Date(y,mo,0).getDate(); }
+function clampDueDate(m, day){ const d=Math.min(Math.max(day,1), daysInMonth(m)); return `${m}-${String(d).padStart(2,'0')}`; }
+function dayDiffISO(a,b){ return Math.round((Date.parse(b)-Date.parse(a))/86400000); }
+function ruleRecurs(rule, m){
+  if(rule.from>m) return false;
+  const f=rule.freq||'monthly';
+  if(f==='monthly') return true;
+  if(f==='once') return rule.from===m;
+  const d=monthDiff(rule.from,m);
+  if(f==='yearly') return d%12===0;
+  if(f==='everyN') return d%Math.max(1,rule.everyN||1)===0;
+  return true;
+}
+// resolve the active income rule for a category in a month → {amount,dueDay,freq,everyN} or null
+function incomeRule(catId, m){
+  const ov=state.incomeOverride && state.incomeOverride[m] && state.incomeOverride[m][catId];
+  if(ov){ return ov.off ? null : {amount:ov.amount||0, dueDay:ov.dueDay||null, freq:'once'}; }
+  const rules=(state.incomePlan&&state.incomePlan[catId])||[];
+  let best=null;
+  for(const r of rules){ if(ruleRecurs(r,m) && (!best || r.from>best.from)) best=r; }
+  return best ? {amount:best.amount||0, dueDay:best.dueDay||null, freq:best.freq, everyN:best.everyN} : null;
+}
+// expected income = the resolved target amount (own share) for an income node in a month
+function expected(catId, mKey){ const r=incomeRule(catId,mKey); return r?r.amount:0; }
+function incomeDueDay(catId, mKey){ const r=incomeRule(catId,mKey); return r?r.dueDay:null; }
+// payment status (did the money arrive vs its due date) — actual>0 ⇒ paid regardless of amount
+function incomePaymentStatus(catId, m){
+  const r=incomeRule(catId,m); if(!r||!r.amount) return null;
+  if(activity(catId,m)>0) return 'paid';
+  if(!r.dueDay) return null;                         // no due date to judge timing against
+  const due=clampDueDate(m, r.dueDay), today=todayISO();
+  if(today<due) return 'due';
+  return dayDiffISO(due,today)<=5 ? 'pastdue' : 'overdue';
+}
+// budgeting status (rolled target vs rolled actual)
+function incomeBudgetStatus(node, m){
+  const tgt=rolled(node,m,expected); if(!tgt) return null;
+  const act=rolled(node,m,activity);
+  if(act===0) return 'awaited';
+  return act<tgt ? 'less' : act>tgt ? 'more' : 'as';
+}
 
 // cumulative available through selected month (rolls forward, incl. negatives)
 function monthsUpTo(mKey){
@@ -1393,18 +1467,21 @@ function budgetView(){
 // Income forecast table: Expected / Actual / Difference, rolled up per month
 function incomeTable(){
   const t=document.createElement('div'); t.className='btable income';
-  t.innerHTML=`<div class="brow-h"><div>${T('income_by_source')}</div><div class="num">${T('col_expected')}</div><div class="num">${T('col_actual')}</div><div class="num">${T('col_difference')}</div></div>`;
+  t.innerHTML=`<div class="brow-h"><div>${T('income_by_source')}</div><div class="num">${T('col_target')}</div><div>${T('col_due')}</div><div class="num">${T('col_actual')}</div><div>${T('col_status')}</div></div>`;
   const m=ui.month;
+  const payBadge=id=>{ const s=incomePaymentStatus(id,m); return s?`<span class="stat-badge ${s}">${T('st_'+s)}</span>`:''; };
+  const budBadge=node=>{ const s=incomeBudgetStatus(node,m); return s?`<span class="stat-badge ${s}">${T('st_'+s)}</span>`:''; };
   const rowHtml=(node,level)=>{
     const kids=nodeKids(node), hasKids=kids.length>0, coll=!!ui.collapsed[node.id];
-    const exp=rolled(node,m,expected), act=rolled(node,m,activity), diff=act-exp;
-    const dcls=diff<0?'neg':diff>0?'pos':'zero';
+    const tgt=rolled(node,m,expected), act=rolled(node,m,activity);
+    const due=incomeDueDay(node.id,m);
     const caret = hasKids ? `<span class="caret ${coll?'c':''}" data-caret="${node.id}">▼</span>` : `<span class="caret-sp"></span>`;
     return `<div class="cat-row lvl${level} ${hasKids?'is-parent':''}" data-cat="${node.id}">
       <div class="cat-name"><div class="nm">${caret}<span class="nm-txt">${node.name}</span></div></div>
-      <div class="assigned-cell"><span class="val" data-expect="${node.id}">${fmt(exp)}</span></div>
+      <div class="assigned-cell"><span class="val" data-target="${node.id}">${tgt?fmt(tgt):'—'}</span></div>
+      <div class="due-cell">${due?`<span class="due-day">${due}</span>`:''}${payBadge(node.id)}</div>
       <div class="num">${act?fmt(act):'—'}</div>
-      <div class="num"><span class="avail-pill ${dcls}">${diff>0?'+':''}${fmt(diff)}</span></div>
+      <div>${budBadge(node)}</div>
     </div>`;
   };
   const root=incomeRoot();
@@ -1430,30 +1507,65 @@ function incomeTable(){
   t.append(foot);
   // events
   t.querySelectorAll('[data-caret]').forEach(c=>c.onclick=e=>{e.stopPropagation();const id=c.dataset.caret;ui.collapsed[id]=!ui.collapsed[id];render();});
-  t.querySelectorAll('[data-expect]').forEach(el=>el.onclick=e=>{e.stopPropagation();editExpected(el);});
+  t.querySelectorAll('[data-target]').forEach(el=>el.onclick=e=>{e.stopPropagation();openIncomeTarget(el.dataset.target);});
   t.querySelectorAll('[data-addcat]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAddCategory(b.dataset.addcat);});
   t.querySelectorAll('[data-addsub]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAddSub(b.dataset.addsub);});
   foot.querySelector('#addIncSectionBtn').onclick=()=>openAddGroup('income');
   return t;
 }
 
-function editExpected(el){
-  const catId=el.dataset.expect, m=ui.month;
-  const node=catById(catId), kids=node?nodeKids(node):[];
-  const childSum = kids.filter(k=>!k.archived).reduce((s,k)=>s+rolled(k,m,expected),0);
-  const shown = childSum + expected(catId,m);
-  const inp=document.createElement('input'); inp.type='text'; inp.value=(shown/100).toFixed(2).replace('.',',');
-  el.replaceWith(inp); inp.focus(); inp.select();
-  const commit=()=>{
-    let v=parseAmt(inp.value);
-    if(v<childSum) v=childSum;
-    if(!state.expected) state.expected={};
-    if(!state.expected[m]) state.expected[m]={};
-    state.expected[m][catId] = v - childSum;
-    save(); render();
+// Income target editor: amount + due day + frequency + "apply to following months" (recurring rule vs one-month override)
+function openIncomeTarget(catId){
+  const m=ui.month, node=catById(catId); if(!node) return;
+  const kids=nodeKids(node);
+  const childSum=kids.filter(k=>!k.archived).reduce((s,k)=>s+rolled(k,m,expected),0);
+  const rule=incomeRule(catId,m)||{};
+  const shownAmt=childSum + (rule.amount||0);
+  const grosz=g=>g?(g/100).toFixed(2).replace('.',','):'';
+  const isOverride = !!(state.incomeOverride && state.incomeOverride[m] && state.incomeOverride[m][catId]);
+  const freq = rule.freq || 'monthly';
+  openModal(`<div class="modal"><div class="modal-h"><h3>${T('income_target')} — ${escapeHtml(node.name)}</h3><button class="x" data-close>×</button></div>
+    <div class="modal-b">
+      <div class="tgt-txt" style="margin-bottom:10px">${escapeHtml(nodePathById(catId))} · ${keyToLabel(m)}</div>
+      <div class="row2">
+        <div class="field"><label>${T('target_amount')}</label><input id="itAmt" type="text" placeholder="0,00" value="${shownAmt?grosz(shownAmt):''}"></div>
+        <div class="field"><label>${T('due_day')}</label><input id="itDue" type="number" min="1" max="31" placeholder="—" value="${rule.dueDay||''}"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>${T('frequency')}</label><select id="itFreq">
+          <option value="monthly" ${freq==='monthly'?'selected':''}>${T('freq_monthly')}</option>
+          <option value="yearly" ${freq==='yearly'?'selected':''}>${T('freq_yearly')}</option>
+          <option value="everyN" ${freq==='everyN'?'selected':''}>${T('freq_everyN')}</option>
+          <option value="once" ${freq==='once'?'selected':''}>${T('freq_once')}</option>
+        </select></div>
+        <div class="field" id="itEveryField" style="${freq==='everyN'?'':'display:none'}"><label>${T('every_n_label')}</label><input id="itEvery" type="number" min="2" max="12" value="${rule.everyN||3}"></div>
+      </div>
+      <label class="chk-row"><input type="checkbox" id="itFuture" ${(!isOverride)?'checked':''}> ${T('apply_future')}</label>
+    </div>
+    <div class="modal-f">
+      <button class="mini-btn" id="itClear" style="background:none;color:var(--red);width:auto;margin:0 auto 0 0;padding:8px 2px">${T('clear_target')}</button>
+      <button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="itSave">${T('save')}</button></div></div>`);
+  const $=s=>modalHost.querySelector(s);
+  $('#itFreq').onchange=()=>{ $('#itEveryField').style.display = $('#itFreq').value==='everyN'?'block':'none'; };
+  const write=(own,dueDay,freqV,everyN,future)=>{
+    if(future){
+      const rules=((state.incomePlan[catId]||[]).filter(r=>r.from!==m));   // replace any rule starting this month
+      rules.push({from:m, amount:own, dueDay:dueDay||null, freq:freqV, ...(freqV==='everyN'?{everyN}:{})});
+      state.incomePlan[catId]=rules;
+      if(state.incomeOverride[m]) delete state.incomeOverride[m][catId];    // let the rule take effect this month
+    } else {
+      (state.incomeOverride[m]=state.incomeOverride[m]||{})[catId]={amount:own, dueDay:dueDay||null};
+    }
+    save(); closeModal(); render();
   };
-  inp.onkeydown=e=>{if(e.key==='Enter')commit(); if(e.key==='Escape')render();};
-  inp.onblur=commit;
+  $('#itSave').onclick=()=>{
+    let v=parseAmt($('#itAmt').value); if(v<childSum) v=childSum;
+    const own=v-childSum;
+    const dueDay=Math.max(0,Math.min(31, parseInt($('#itDue').value,10)||0))||null;
+    const freqV=$('#itFreq').value, everyN=Math.max(2,Math.min(12, parseInt($('#itEvery').value,10)||3));
+    write(own, dueDay, freqV, everyN, $('#itFuture').checked);
+  };
+  $('#itClear').onclick=()=>{ write(0, null, $('#itFreq').value, 3, $('#itFuture').checked); };
 }
 
 function editAssign(el){
@@ -1573,7 +1685,8 @@ function deleteCategory(nodeId){
   else state.groups=prune(state.groups);
   state.transactions.forEach(t=>{ if(ids.has(t.categoryId)) t.categoryId=null; });     // orphaned txns → uncategorized
   for(const mm of Object.values(state.assignments)) ids.forEach(id=>{ delete mm[id]; });  // drop assignments
-  for(const mm of Object.values(state.expected||{})) ids.forEach(id=>{ delete mm[id]; }); // drop expected income
+  for(const mm of Object.values(state.incomeOverride||{})) ids.forEach(id=>{ delete mm[id]; }); // drop income overrides
+  ids.forEach(id=>{ if(state.incomePlan) delete state.incomePlan[id]; });                 // drop income recurring rules
   ui.selCat=null; render();
 }
 function openAddSub(catId, index){
