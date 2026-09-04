@@ -319,6 +319,38 @@
   .txn-table .amt.in{color:var(--green);}
   .txn-table .amt.transfer{color:var(--ink-soft);}   /* internal transfer nets to zero — show neutral */
   .txn-note-cell{color:var(--ink-soft);font-size:.8rem;max-width:220px;overflow:hidden;text-overflow:ellipsis;}
+  .pill-cat.split{background:#efeafe;color:#6a41c9;}
+  .spl-breakdown{font-size:.72rem;color:var(--ink-soft);margin-top:3px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* tags */
+  .tag-badge{display:inline-block;padding:1px 8px;border-radius:var(--r-pill);font-size:.68rem;font-weight:700;
+    color:var(--tc);background:color-mix(in srgb, var(--tc) 15%, transparent);vertical-align:middle;white-space:nowrap;}
+  .tag-pick{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  .tag-chip{padding:4px 11px;border-radius:var(--r-pill);font-size:.8rem;font-weight:600;border:1px solid var(--tc,var(--line));
+    color:var(--tc,var(--ink-soft));background:transparent;transition:.12s;}
+  .tag-chip.on{color:#fff;background:var(--tc);border-color:var(--tc);}
+  .tag-chip.tag-new{color:var(--ink-soft);border-style:dashed;border-color:var(--line);font-weight:700;}
+  .tag-chip.tag-new:hover{color:var(--brand);border-color:var(--brand);}
+  .tag-new-input{padding:4px 10px;border:1px solid var(--accent);border-radius:var(--r-pill);outline:none;font-size:.8rem;width:120px;}
+  .tag-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:middle;}
+  /* tag manager */
+  .tgm-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);}
+  .tgm-sw{width:22px;height:22px;border-radius:50%;flex:0 0 auto;border:2px solid #fff;box-shadow:var(--sh-1);cursor:pointer;}
+  .tgm-name{flex:1;border:1px solid transparent;border-radius:var(--r-sm);padding:6px 8px;outline:none;background:transparent;font-size:.9rem;min-width:0;}
+  .tgm-name:hover{border-color:var(--line);} .tgm-name:focus{border-color:var(--accent);background:var(--surface);}
+  .tgm-del{width:30px;height:30px;border-radius:var(--r-sm);color:var(--ink-soft);flex:0 0 auto;}
+  .tgm-del:hover:not(:disabled){background:var(--red-bg);color:var(--red);} .tgm-del:disabled{opacity:.3;cursor:not-allowed;}
+  .tgm-add{display:flex;gap:8px;margin-top:12px;} .tgm-add input{flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm);outline:none;}
+  /* split editor lines */
+  .spl-line{margin-bottom:12px;padding-bottom:10px;border-bottom:1px dashed var(--line);}
+  .spl-line-main{display:flex;gap:8px;align-items:center;}
+  .spl-line-tag{margin-top:6px;padding-left:2px;}
+  .spl-line .spl-cat{flex:1;min-width:0;}
+  .spl-line .spl-amt{width:110px;flex:0 0 auto;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm);outline:none;font-size:.95rem;text-align:right;font-variant-numeric:tabular-nums;}
+  .spl-line .spl-amt:focus{border-color:var(--accent);}
+  .spl-del-line{flex:0 0 auto;width:30px;height:30px;border-radius:var(--r-sm);color:var(--ink-soft);font-size:.9rem;}
+  .spl-del-line:hover:not(:disabled){background:var(--red-bg);color:var(--red);}
+  .spl-del-line:disabled{opacity:.3;cursor:not-allowed;}
+  .spl-total-row{display:flex;justify-content:space-between;align-items:center;padding:8px 2px 2px;font-size:.92rem;border-top:1px solid var(--line);margin-top:4px;}
   /* Ready-to-Assign breakdown modal */
   .rb-sec-h{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);font-weight:700;margin:4px 0 2px;}
   .rb-sub{font-size:.72rem;color:var(--ink-soft);margin:10px 0 0;}
@@ -615,6 +647,9 @@ const I18N = {
     payee:'Payee', note:'Note', note_ph:'Optional note',
     payee_ph:'e.g. Grocery store', unnamed:'(unnamed)', diff_places:'Choose two different places', transfer_done:'Transfer complete',
     txn_added:'Transaction added', edit_txn:'Edit transaction', edit_transfer:'Edit transfer', transfer_edit_note:'Edit transfers by deleting and re-adding',
+    split:'Split', split_txn:'Split transaction', add_line:'+ Add line', split_total:'Total',
+    tag:'Tag', tags:'Tags', no_tag:'No tag', new_tag:'New tag', manage_tags:'Manage tags', tag_manager:'Tags', untagged:'Untagged',
+    spending_by_tag:'Spending by tag', tag_name_ph:'Tag name', by_category:'By category', by_tag:'By tag',
     new_category:'New category', category_name:'Category name', category_ph:'e.g. Subscriptions',
     new_group:'New category group', group_name:'Group name', group_ph:'e.g. Kids',
     dash_income:'Income', dash_expenses:'Expenses', dash_month_balance:'Month balance', dash_net_worth:'Net worth',
@@ -681,6 +716,9 @@ const I18N = {
     payee:'Odbiorca', note:'Notatka', note_ph:'Notatka (opcjonalnie)',
     payee_ph:'np. Biedronka', unnamed:'(bez nazwy)', diff_places:'Wybierz różne miejsca', transfer_done:'Przelew wykonany',
     txn_added:'Dodano transakcję', edit_txn:'Edytuj transakcję', edit_transfer:'Edytuj przelew', transfer_edit_note:'Przelewy edytuj przez usunięcie i dodanie',
+    split:'Podział', split_txn:'Podziel transakcję', add_line:'+ Dodaj wiersz', split_total:'Razem',
+    tag:'Tag', tags:'Tagi', no_tag:'Bez tagu', new_tag:'Nowy tag', manage_tags:'Zarządzaj tagami', tag_manager:'Tagi', untagged:'Bez tagu',
+    spending_by_tag:'Wydatki wg tagu', tag_name_ph:'Nazwa tagu', by_category:'Wg kategorii', by_tag:'Wg tagu',
     new_category:'Nowa kategoria', category_name:'Nazwa kategorii', category_ph:'np. Subskrypcje',
     new_group:'Nowa grupa kategorii', group_name:'Nazwa grupy', group_ph:'np. Dzieci',
     dash_income:'Przychód', dash_expenses:'Wydatki', dash_month_balance:'Bilans miesiąca', dash_net_worth:'Wartość netto',
@@ -833,7 +871,10 @@ function seed(){
     delete p._seed;
   }}));
 
-  return { currency:'PLN', accounts:accts, groups, incomeGroups, transactions:txns, assignments:asg, expected:exp,
+  // demo tags (reporting dimension: "for whom") — throwaway, user builds their own
+  const tags=[{id:uid('tg'),name:'Dzieci',color:'#3b82f6'},{id:uid('tg'),name:'Żona',color:'#ec4899'},{id:uid('tg'),name:'Dom',color:'#10b981'}];
+
+  return { currency:'PLN', accounts:accts, groups, incomeGroups, transactions:txns, assignments:asg, expected:exp, tags,
            meta:{rtaKey:RTA, created:'2026-08-15'} };
 }
 
@@ -848,6 +889,7 @@ function normalize(s){
   }
   if(!Array.isArray(s.incomeGroups)) s.incomeGroups=[];
   if(!s.expected || typeof s.expected!=='object') s.expected={};
+  if(!Array.isArray(s.tags)) s.tags=[];
   return s;
 }
 // remembered payees per category
@@ -858,6 +900,59 @@ function rememberPayee(catId,name){
   if(!state.payees[catId].includes(name)) state.payees[catId].push(name);
 }
 function deletePayee(catId,name){ if(state.payees&&state.payees[catId]){ state.payees[catId]=state.payees[catId].filter(n=>n!==name); save(); } }
+
+/* ---------- TAGS (reporting dimension: exclusive, colored, not budgeted) ---------- */
+const TAG_COLORS=['#3b82f6','#ec4899','#10b981','#f59e0b','#8b5cf6','#ef4444','#14b8a6','#6366f1'];
+function tagById(id){ return (state.tags||[]).find(t=>t.id===id)||null; }
+function addTag(name,color){ if(!state.tags) state.tags=[]; const t={id:uid('tg'),name:name.trim(),color:color||TAG_COLORS[state.tags.length%TAG_COLORS.length]}; state.tags.push(t); save(); return t; }
+function tagTxnCount(id){ return state.transactions.filter(t=>t.tagId===id).length; }
+// small colored badge for a tag id (or '' if none/archived)
+function tagBadge(id){ const t=tagById(id); if(!t||t.archived) return ''; return `<span class="tag-badge" style="--tc:${t.color}">${escapeHtml(t.name)}</span>`; }
+// chip picker: single-select; hidden input #hiddenId holds the chosen tagId
+function tagPickerHTML(hiddenId, selId){
+  const chips=(state.tags||[]).filter(t=>!t.archived).map(t=>`<button type="button" class="tag-chip ${t.id===selId?'on':''}" data-tag="${t.id}" style="--tc:${t.color}">${escapeHtml(t.name)}</button>`).join('');
+  return `<div class="tag-pick"><input type="hidden" id="${hiddenId}" value="${selId||''}">${chips}<button type="button" class="tag-chip tag-new" title="${T('new_tag')}">＋</button></div>`;
+}
+function wireTagPicker(scope){
+  scope.querySelectorAll('.tag-pick').forEach(pick=>{
+    const hidden=pick.querySelector('input[type=hidden]');
+    const sel=()=>{ pick.querySelectorAll('.tag-chip[data-tag]').forEach(c=>c.classList.toggle('on',c.dataset.tag===hidden.value)); };
+    pick.querySelectorAll('.tag-chip[data-tag]').forEach(c=>c.onclick=()=>{ hidden.value = hidden.value===c.dataset.tag ? '' : c.dataset.tag; sel(); });
+    const nb=pick.querySelector('.tag-new');
+    nb.onclick=()=>{
+      const inp=document.createElement('input'); inp.className='tag-new-input'; inp.placeholder=T('tag_name_ph');
+      nb.replaceWith(inp); inp.focus();
+      const commit=()=>{ const v=inp.value.trim(); if(v){ const t=addTag(v); const btn=document.createElement('button'); btn.type='button'; btn.className='tag-chip on'; btn.dataset.tag=t.id; btn.style.setProperty('--tc',t.color); btn.textContent=t.name; btn.onclick=()=>{ hidden.value=hidden.value===t.id?'':t.id; sel(); }; inp.replaceWith(btn); hidden.value=t.id; sel(); const nn=document.createElement('button'); nn.type='button'; nn.className='tag-chip tag-new'; nn.title=T('new_tag'); nn.textContent='＋'; btn.after(nn); wireTagPicker(pick.parentElement); } else inp.remove(); };
+      inp.onkeydown=e=>{ if(e.key==='Enter'){e.preventDefault();commit();} else if(e.key==='Escape'){ const nn=document.createElement('button'); nn.type='button'; nn.className='tag-chip tag-new'; nn.title=T('new_tag'); nn.textContent='＋'; inp.replaceWith(nn); wireTagPicker(pick.parentElement); } };
+      inp.onblur=commit;
+    };
+  });
+}
+// Tag manager: add / rename / recolor / disable / delete(if unused)
+function openTagManager(){
+  const rows=(state.tags||[]).map(t=>{ const used=tagTxnCount(t.id);
+    return `<div class="tgm-row" data-id="${t.id}">
+      <button class="tgm-sw" data-sw="${t.id}" style="background:${t.color}" title="${T('color')||'Color'}"></button>
+      <input class="tgm-name" data-id="${t.id}" value="${escapeHtml(t.name)}">
+      ${t.archived?`<span class="cm-tag">${T('disabled_label')}</span>`:''}
+      <button class="cm-toggle ${t.archived?'':'on'}" data-arch="${t.id}" role="switch" aria-checked="${!t.archived}" title="${t.archived?T('enable'):T('disable')}"><span class="knob"></span></button>
+      <button class="tgm-del" data-del="${t.id}" ${used?'disabled':''} title="${used?T('cant_delete_txn',used,''):T('delete')}">✕</button>
+    </div>`; }).join('') || `<div class="tgt-txt">—</div>`;
+  openModal(`<div class="modal"><div class="modal-h"><h3>${T('tag_manager')}</h3><button class="x" data-close>×</button></div>
+    <div class="modal-b" style="max-height:60vh;overflow:auto">
+      <div id="tgmList">${rows}</div>
+      <div class="tgm-add"><input id="tgmNew" placeholder="${T('tag_name_ph')}"><button class="btn" id="tgmAdd">${T('add')}</button></div>
+    </div>
+    <div class="modal-f"><button class="btn" data-close>${T('close')}</button></div></div>`);
+  const rerender=()=>{ closeModal(); openTagManager(); };
+  modalHost.querySelectorAll('.tgm-name').forEach(inp=>inp.onchange=()=>{ const t=tagById(inp.dataset.id); if(t){ const v=inp.value.trim(); if(v){t.name=v;save();} else inp.value=t.name; } });
+  modalHost.querySelectorAll('[data-arch]').forEach(b=>b.onclick=()=>{ const t=tagById(b.dataset.arch); if(t){ t.archived=!t.archived; save(); rerender(); } });
+  modalHost.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(b.disabled) return; state.tags=state.tags.filter(x=>x.id!==b.dataset.del); save(); rerender(); });
+  modalHost.querySelectorAll('[data-sw]').forEach(b=>b.onclick=()=>{ const t=tagById(b.dataset.sw); if(!t) return; const i=TAG_COLORS.indexOf(t.color); t.color=TAG_COLORS[(i+1)%TAG_COLORS.length]; save(); rerender(); });
+  const add=()=>{ const v=modalHost.querySelector('#tgmNew').value.trim(); if(v){ addTag(v); rerender(); } };
+  modalHost.querySelector('#tgmAdd').onclick=add;
+  modalHost.querySelector('#tgmNew').onkeydown=e=>{ if(e.key==='Enter') add(); };
+}
 // give every transaction a monotonic creation sequence (for same-date ordering); backfill by array order
 function initSeq(s){
   seqCounter = (s.transactions||[]).reduce((m,t)=>Math.max(m, t.seq||0), 0);
@@ -911,6 +1006,7 @@ function doTransfer(src,dst,amount,date){
 function deleteTransaction(id){
   const t=state.transactions.find(x=>x.id===id); if(!t) return;
   if(t.transferId) state.transactions=state.transactions.filter(x=>x.transferId!==t.transferId);
+  else if(t.splitId) state.transactions=state.transactions.filter(x=>x.splitId!==t.splitId);   // delete the whole split
   else state.transactions=state.transactions.filter(x=>x.id!==id);
   render();
 }
@@ -1524,8 +1620,27 @@ function accountsView(){
     <table class="txn-table"><thead><tr>
       <th>${T('col_date')}</th>${acct?'':`<th>${T('col_account')}</th>`}<th>${T('col_payee')}</th><th>${T('col_category')}</th><th>${T('note')}</th><th style="text-align:right">${T('col_amount')}</th><th style="width:64px"></th>
     </tr></thead><tbody>
-    ${(()=>{ const seenTr=new Set(); return txns.map(t=>{
+    ${(()=>{ const seenTr=new Set(), seenSplit=new Set(); return txns.map(t=>{
       const acts=id=>`<td class="txn-actions"><button class="tx-edit" data-txedit="${id}" title="${T('edit')}">✎</button><button class="tx-del" data-txdel="${id}" title="${T('delete')}">✕</button></td>`;
+      // collapse a split to ONE row — Category = "Split" pill + the line categories; Amount = sum of lines
+      if(t.splitId){
+        if(seenSplit.has(t.splitId)) return '';
+        seenSplit.add(t.splitId);
+        const grp=state.transactions.filter(x=>x.splitId===t.splitId);
+        const sum=grp.reduce((s,x)=>s+x.amount,0);
+        const names=grp.map(x=>x.categoryId?(catById(x.categoryId)?catById(x.categoryId).name:'—'):T('pill_uncat')).join(' · ');
+        const an=state.accounts.find(a=>a.id===t.accountId);
+        const tagIds=[...new Set(grp.map(x=>x.tagId||''))];
+        const sharedTag=(tagIds.length===1&&tagIds[0])?tagBadge(tagIds[0]):'';   // show a tag only if all lines share it
+        return `<tr data-txnrow="${t.id}">
+          <td>${t.date}</td>
+          ${acct?'':`<td style="color:var(--ink-soft)">${an?escapeHtml(an.name):''}</td>`}
+          <td>${escapeHtml(t.payee)} ${sharedTag}</td>
+          <td><span class="pill-cat split">⧉ ${T('split')} (${grp.length})</span><div class="spl-breakdown">${escapeHtml(names)}</div></td>
+          <td class="txn-note-cell">${t.memo?escapeHtml(t.memo):''}</td>
+          <td class="amt ${sum>0?'in':''}">${fmt(sum)}</td>
+          ${acts(t.id)}</tr>`;
+      }
       // ALL accounts: collapse an internal transfer to ONE row — Account = from, Payee = to, Category = "Transfer"
       if(!acct && t.type==='transfer'){
         if(seenTr.has(t.transferId)) return '';
@@ -1546,7 +1661,7 @@ function accountsView(){
       return `<tr data-txnrow="${t.id}">
         <td>${t.date}</td>
         ${acct?'':`<td style="color:var(--ink-soft)">${an?escapeHtml(an.name):''}</td>`}
-        <td>${escapeHtml(t.payee)}</td>
+        <td>${escapeHtml(t.payee)} ${tagBadge(t.tagId)}</td>
         <td>${cat}</td>
         <td class="txn-note-cell">${t.memo?escapeHtml(t.memo):''}</td>
         <td class="amt ${t.amount>0?'in':''}">${fmt(t.amount)}</td>
@@ -1781,17 +1896,42 @@ function toggleExpandAll(root){
   const target=!allExpanded(root); if(!ui.catExpanded) ui.catExpanded={};
   (root||[]).forEach(sec=>{ ui.catExpanded[sec.id]=target; (sec.categories||[]).forEach(cat=>{ ui.catExpanded[cat.id]=target; }); });
 }
+// spending (expense) grouped by tag for a month; '__u__' = untagged
+function spendByTag(m){
+  const inc=incomeIdSet(); const out={};
+  state.transactions.forEach(t=>{
+    if(txnMonth(t)!==m || t.starting || t.type==='pocket' || t.type==='transfer' || t.amount>=0) return;
+    if(t.categoryId===RTA() || inc.has(t.categoryId)) return;   // expenses only
+    const k=t.tagId||'__u__'; out[k]=(out[k]||0)+t.amount;
+  });
+  return out;
+}
 function reportsView(){
   const el=document.createElement('div'); el.style.maxWidth='980px'; el.style.margin='0 auto';
-  const m=ui.month; const {spendByCat}=monthStats(m);
-  const rows = Object.entries(spendByCat).map(([id,v])=>({name:catById(id)?catById(id).name:'—',amt:-v}))
-    .filter(r=>r.amt>0).sort((a,b)=>b.amt-a.amt);
+  const m=ui.month; const kind=ui.reportKind==='tag'?'tag':'cat';
+  let rows;
+  if(kind==='tag'){
+    rows=Object.entries(spendByTag(m)).map(([id,v])=>({name:id==='__u__'?T('untagged'):(tagById(id)?tagById(id).name:'—'), color:id==='__u__'?null:(tagById(id)?tagById(id).color:null), amt:-v}));
+  } else {
+    const {spendByCat}=monthStats(m);
+    rows=Object.entries(spendByCat).map(([id,v])=>({name:catById(id)?catById(id).name:'—', color:null, amt:-v}));
+  }
+  rows=rows.filter(r=>r.amt>0).sort((a,b)=>b.amt-a.amt);
   const maxSpend=Math.max(1,...rows.map(r=>r.amt));
-  el.innerHTML=`<div class="rep-panel"><h3>${T('spending_by_cat')} — ${keyToLabel(m)}</h3>
-    ${rows.length?rows.map(r=>`<div class="spend-row"><div class="nm">${r.name}</div>
-      <div class="bar"><i style="width:${Math.round(r.amt/maxSpend*100)}%"></i></div>
+  el.innerHTML=`<div class="rep-panel">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <h3 style="margin:0">${kind==='tag'?T('spending_by_tag'):T('spending_by_cat')} — ${keyToLabel(m)}</h3>
+      <div class="seg-toggle" style="margin-left:auto">
+        <button class="${kind==='cat'?'on':''}" data-rk="cat">${T('by_category')}</button>
+        <button class="${kind==='tag'?'on':''}" data-rk="tag">${T('by_tag')}</button></div>
+      ${kind==='tag'?`<button class="btn ghost" id="mgTags">${T('manage_tags')}</button>`:''}
+    </div>
+    ${rows.length?rows.map(r=>`<div class="spend-row"><div class="nm">${r.color?`<span class="tag-dot" style="background:${r.color}"></span>`:''}${escapeHtml(r.name)}</div>
+      <div class="bar"><i style="width:${Math.round(r.amt/maxSpend*100)}%${r.color?`;background:${r.color}`:''}"></i></div>
       <div class="amt">${fmt(r.amt)}</div></div>`).join(''):`<div style="color:var(--ink-soft)">${T('no_expenses')}</div>`}
   </div>`;
+  el.querySelectorAll('[data-rk]').forEach(b=>b.onclick=()=>{ ui.reportKind=b.dataset.rk; render(); });
+  const mg=el.querySelector('#mgTags'); if(mg) mg.onclick=openTagManager;
   return el;
 }
 
@@ -1879,12 +2019,14 @@ function openAddTxn(){
       <div class="field" id="txNoteField"><label>${T('note')}</label><input id="txNote" type="text" placeholder="${T('note_ph')}"></div>
       <div class="field" id="txPayeeField"><label>${T('payee')}</label>
         <div class="payee-combo"><input id="txPayee" type="text" autocomplete="off" placeholder="${T('payee_ph')}"><div class="cc-list"></div></div></div>
+      <div class="field" id="txTagField"><label>${T('tag')}</label>${tagPickerHTML('txTag','')}</div>
     </div>
-    <div class="modal-f"><button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="txSave">${T('save')}</button></div></div>`);
+    <div class="modal-f"><button class="mini-btn ghost" id="txSplit" style="width:auto;padding:8px 10px;margin-right:auto">⧉ ${T('split')}</button><button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="txSave">${T('save')}</button></div></div>`);
   const $=s=>modalHost.querySelector(s);
   let type='out';
   wireCatCombos(modalHost, ()=> allCats(type==='in'?incomeRoot():state.groups));
   wirePayeeCombo(modalHost, ()=> $('#txCat').value||'');
+  wireTagPicker(modalHost);
   const clearCat=()=>{ $('#txCat').value=''; const ci=modalHost.querySelector('.cc-input'); if(ci) ci.value=''; };
   const setSeg=t=>{ const prev=type; type=t;
     [['out','#segOut'],['in','#segIn'],['tr','#segTr']].forEach(([k,s])=>$(s).classList.toggle('on',k===t));
@@ -1893,9 +2035,14 @@ function openAddTxn(){
     $('#txPayeeField').style.display=t==='tr'?'none':'block';
     $('#txNoteField').style.display=t==='tr'?'none':'block';
     $('#txCatField').style.display=t==='tr'?'none':'block';
+    $('#txTagField').style.display=t==='tr'?'none':'block';
+    $('#txSplit').style.display=t==='tr'?'none':'inline-flex';
     if((prev==='in')!==(t==='in')) clearCat();   // switching between income/expense trees resets the picker
   };
   $('#segOut').onclick=()=>setSeg('out'); $('#segIn').onclick=()=>setSeg('in'); $('#segTr').onclick=()=>setSeg('tr');
+  $('#txSplit').onclick=()=>{ const amt=parseAmt($('#txAmt').value);
+    openSplitEditor({type, accountId:$('#txAcct').value, date:$('#txDate').value, payee:$('#txPayee').value.trim(),
+      note:$('#txNote').value.trim(), categoryId:$('#txCat').value, amount:amt||undefined}); };
   $('#txSave').onclick=()=>{
     const amt=parseAmt($('#txAmt').value); if(!amt){toast(T('enter_amount'));return;}
     const date=$('#txDate').value;
@@ -1906,9 +2053,10 @@ function openAddTxn(){
     }
     const payee=$('#txPayee').value.trim();
     const note=$('#txNote').value.trim();
+    const tagId=$('#txTag').value||null;
     const cid = type==='in' ? ($('#txCat').value||RTA()) : $('#txCat').value;   // uncategorized income still lands in Ready to Assign
     state.transactions.push({id:uid('t'),seq:nextSeq(),date,accountId:$('#txAcct').value,
-      payee:payee||T('unnamed'), categoryId:cid,
+      payee:payee||T('unnamed'), categoryId:cid, tagId,
       amount: type==='in'?amt:-amt, memo:note, cleared:false});
     rememberPayee(cid, payee);
     closeModal(); toast(T('txn_added')); render();
@@ -1918,6 +2066,7 @@ function openAddTxn(){
 // Edit an existing normal (expense/income) transaction
 function openEditTxn(id){
   const t=state.transactions.find(x=>x.id===id); if(!t) return;
+  if(t.splitId){ openSplitEditor({splitId:t.splitId}); return; }
   if(t.type==='transfer'){ openEditTransfer(id); return; }
   if(t.type==='pocket'){ toast(T('transfer_edit_note')); return; }
   const cats=allCats();
@@ -1934,14 +2083,17 @@ function openEditTxn(id){
       <div class="field"><label>${T('note')}</label><input id="txNote" type="text" placeholder="${T('note_ph')}" value="${(t.memo||'').replace(/"/g,'&quot;')}"></div>
       <div class="field"><label>${T('payee')}</label>
         <div class="payee-combo"><input id="txPayee" type="text" autocomplete="off" value="${(t.payee||'').replace(/"/g,'&quot;')}"><div class="cc-list"></div></div></div>
+      <div class="field"><label>${T('tag')}</label>${tagPickerHTML('txTag', t.tagId||'')}</div>
     </div>
     <div class="modal-f">
       <button class="mini-btn" id="txDel" style="background:none;color:var(--red);width:auto;margin:0 auto 0 0;padding:8px 2px">${T('delete')}</button>
+      <button class="mini-btn ghost" id="txSplit" style="width:auto;padding:8px 10px">⧉ ${T('split')}</button>
       <button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="txSave">${T('save')}</button></div></div>`);
   const $=s=>modalHost.querySelector(s);
   let type = (t.categoryId===RTA()||isIncomeCat(t.categoryId)) ? 'in' : 'out';
   wireCatCombos(modalHost, ()=> allCats(type==='in'?incomeRoot():state.groups));
   wirePayeeCombo(modalHost, ()=> $('#txCat').value||'');
+  wireTagPicker(modalHost);
   const clearCat=()=>{ $('#txCat').value=''; const ci=modalHost.querySelector('.cc-input'); if(ci) ci.value=''; };
   const setSeg=k=>{ const prev=type; type=k;
     $('#segOut').classList.toggle('on',k==='out'); $('#segIn').classList.toggle('on',k==='in');
@@ -1956,12 +2108,16 @@ function openEditTxn(id){
     t.accountId=$('#txAcct').value;
     t.memo=$('#txNote').value.trim();
     t.payee=payee||T('unnamed');
+    t.tagId=$('#txTag').value||null;
     t.categoryId = type==='in' ? ($('#txCat').value||RTA()) : $('#txCat').value;
     t.amount = type==='in' ? amt : -amt;
     rememberPayee(t.categoryId, payee);
     closeModal(); toast(T('changes_saved')); render();
   };
   $('#txDel').onclick=()=>{ if(confirm(T('del_txn_confirm'))){ closeModal(); deleteTransaction(t.id); } };
+  $('#txSplit').onclick=()=>{ const amt=parseAmt($('#txAmt').value);
+    openSplitEditor({type, accountId:$('#txAcct').value, date:$('#txDate').value, payee:$('#txPayee').value.trim(),
+      note:$('#txNote').value.trim(), categoryId:$('#txCat').value, amount:amt||undefined, replaceId:t.id}); };
 }
 
 // Edit an internal transfer: date + note apply to BOTH legs (and any linked pocket earmarks).
@@ -1988,6 +2144,97 @@ function openEditTransfer(id){
     closeModal(); toast(T('changes_saved')); render();
   };
   $('#trDel').onclick=()=>{ if(confirm(T('del_txn_confirm'))){ closeModal(); deleteTransaction(t0.id); } };
+}
+
+// Split editor — one payment across several category lines (model B: each line is a real transaction sharing a splitId).
+// opts: {splitId} to edit an existing split, or {type,accountId,date,payee,note,categoryId,amount,replaceId} to create one.
+function openSplitEditor(opts){
+  opts = opts||{};
+  let type = opts.type || 'out';
+  const splitId = opts.splitId || null;
+  const replaceId = opts.replaceId || null;
+  let acctId, date, payee, note, lines;
+  const grosz=g=>g?(Math.abs(g)/100).toFixed(2).replace('.',','):'';
+  if(splitId){
+    const grp = state.transactions.filter(t=>t.splitId===splitId).sort((a,b)=>(a.seq||0)-(b.seq||0));
+    const first=grp[0]||{};
+    type = (first.categoryId===RTA()||isIncomeCat(first.categoryId)) ? 'in':'out';
+    acctId=first.accountId; date=first.date; payee=first.payee||''; note=first.memo||'';
+    lines = grp.map(l=>({categoryId:l.categoryId===RTA()?'':l.categoryId, amount:grosz(l.amount), tagId:l.tagId||''}));
+  } else {
+    acctId=opts.accountId||((state.accounts.find(a=>a.onBudget)||{}).id||'');
+    date=opts.date||todayISO(); payee=opts.payee||''; note=opts.note||'';
+    lines=[{categoryId:opts.categoryId||'', amount:opts.amount?grosz(opts.amount):'', tagId:opts.tagId||''}, {categoryId:'', amount:'', tagId:''}];
+  }
+  openModal(`<div class="modal"><div class="modal-h"><h3>${T('split_txn')}</h3><button class="x" data-close>×</button></div>
+    <div class="modal-b">
+      <div class="seg"><button id="segOut">${T('expense')}</button><button id="segIn">${T('income')}</button></div>
+      <div class="field"><label>${T('account')}</label><select id="splAcct">${state.accounts.map(a=>`<option value="${a.id}" ${acctId===a.id?'selected':''}>${a.name}</option>`).join('')}</select></div>
+      <div class="field"><label>${T('date')}</label><input id="splDate" type="date" value="${date}"></div>
+      <div class="field"><label>${T('category')}</label><div id="splitLines"></div>
+        <button class="mini-btn ghost" id="splAdd" style="margin-top:6px">${T('add_line')}</button></div>
+      <div class="spl-total-row"><span>${T('split_total')}</span><b id="splTotal">—</b></div>
+      <div class="field"><label>${T('note')}</label><input id="splNote" type="text" placeholder="${T('note_ph')}" value="${(note||'').replace(/"/g,'&quot;')}"></div>
+      <div class="field"><label>${T('payee')}</label>
+        <div class="payee-combo"><input id="txPayee" type="text" autocomplete="off" value="${(payee||'').replace(/"/g,'&quot;')}" placeholder="${T('payee_ph')}"><div class="cc-list"></div></div></div>
+    </div>
+    <div class="modal-f">
+      ${(splitId||replaceId)?`<button class="mini-btn" id="splDel" style="background:none;color:var(--red);width:auto;margin:0 auto 0 0;padding:8px 2px">${T('delete')}</button>`:''}
+      <button class="btn ghost" data-close>${T('cancel')}</button><button class="btn" id="splSave">${T('save')}</button></div></div>`);
+  const $=s=>modalHost.querySelector(s);
+  const lineHTML=(ln,i)=>`<div class="spl-line" data-i="${i}">
+      <div class="spl-line-main">
+        <div class="spl-cat">${catComboHTML('splCat'+i, ln.categoryId)}</div>
+        <input class="spl-amt" data-i="${i}" type="text" placeholder="0,00" value="${ln.amount||''}">
+        <button class="spl-del-line" data-i="${i}" title="${T('delete')}" ${lines.length<=1?'disabled':''}>✕</button>
+      </div>
+      <div class="spl-line-tag">${tagPickerHTML('splTag'+i, ln.tagId||'')}</div>
+    </div>`;
+  const syncFromDOM=()=>modalHost.querySelectorAll('.spl-line').forEach(row=>{ const i=+row.dataset.i;
+    lines[i].categoryId=row.querySelector('.spl-cat input[type=hidden]').value;
+    lines[i].tagId=row.querySelector('.spl-line-tag input[type=hidden]').value;
+    lines[i].amount=row.querySelector('.spl-amt').value; });
+  const total=()=>lines.reduce((s,ln)=>s+parseAmt(ln.amount),0);
+  const updateTotal=()=>{ const t=total(); $('#splTotal').textContent=fmt(type==='in'?t:-t); };
+  const renderLines=()=>{
+    $('#splitLines').innerHTML=lines.map(lineHTML).join('');
+    wireCatCombos($('#splitLines'), ()=> allCats(type==='in'?incomeRoot():state.groups));
+    wireTagPicker($('#splitLines'));
+    $('#splitLines').querySelectorAll('.spl-amt').forEach(inp=>inp.oninput=()=>{ syncFromDOM(); updateTotal(); });
+    $('#splitLines').querySelectorAll('.spl-del-line').forEach(b=>b.onclick=()=>{ syncFromDOM(); if(lines.length>1){ lines.splice(+b.dataset.i,1); renderLines(); } });
+    updateTotal();
+  };
+  renderLines();
+  wirePayeeCombo(modalHost, ()=> (lines[0]&&lines[0].categoryId)||'');
+  $('#splAdd').onclick=()=>{ syncFromDOM(); lines.push({categoryId:'',amount:''}); renderLines(); };
+  const setSeg=k=>{ if(k===type) return; type=k; $('#segOut').classList.toggle('on',k==='out'); $('#segIn').classList.toggle('on',k==='in');
+    syncFromDOM(); lines.forEach(ln=>ln.categoryId=''); renderLines(); };   // switching trees resets categories
+  $('#segOut').classList.toggle('on',type==='out'); $('#segIn').classList.toggle('on',type==='in');
+  $('#segOut').onclick=()=>setSeg('out'); $('#segIn').onclick=()=>setSeg('in');
+  $('#splSave').onclick=()=>{
+    syncFromDOM();
+    const valid=lines.map(ln=>({cid:ln.categoryId, amt:parseAmt(ln.amount), tagId:ln.tagId||null})).filter(ln=>ln.amt>0);
+    if(!valid.length){ toast(T('enter_amount')); return; }
+    const d=$('#splDate').value, acc=$('#splAcct').value, py=$('#txPayee').value.trim()||T('unnamed'), nt=$('#splNote').value.trim();
+    if(splitId) state.transactions=state.transactions.filter(t=>t.splitId!==splitId);   // replace existing lines
+    if(replaceId) state.transactions=state.transactions.filter(t=>t.id!==replaceId);     // converting a normal txn → split
+    const mkCid=cid=> type==='in' ? (cid||RTA()) : cid;
+    if(valid.length===1){                                                                // degenerate split → normal txn
+      const cid=mkCid(valid[0].cid);
+      state.transactions.push({id:uid('t'),seq:nextSeq(),date:d,accountId:acc,payee:py,categoryId:cid,tagId:valid[0].tagId,amount:type==='in'?valid[0].amt:-valid[0].amt,memo:nt,cleared:false});
+      rememberPayee(cid,py);
+    } else {
+      const sid=splitId||uid('spl');
+      valid.forEach(ln=>{ const cid=mkCid(ln.cid);
+        state.transactions.push({id:uid('t'),seq:nextSeq(),date:d,accountId:acc,payee:py,categoryId:cid,tagId:ln.tagId,amount:type==='in'?ln.amt:-ln.amt,memo:nt,cleared:false,splitId:sid});
+        rememberPayee(cid,py); });
+    }
+    closeModal(); toast(T('changes_saved')); render();
+  };
+  const dl=$('#splDel'); if(dl) dl.onclick=()=>{ if(confirm(T('del_txn_confirm'))){
+    if(splitId) state.transactions=state.transactions.filter(t=>t.splitId!==splitId);
+    if(replaceId) state.transactions=state.transactions.filter(t=>t.id!==replaceId);
+    closeModal(); render(); } };
 }
 function typeOptions(sel){
   return ['checking','savings','cash','credit','tracking']
