@@ -138,6 +138,7 @@
   .rta.zero{background:#334;}
   .rta.neg{background:var(--red);}
   .rta.pos{background:var(--green);}
+  .rta.past{background:var(--grey-fg,#8a94a6);opacity:.55;}   /* past month — view only */
   .rta .amt{font-size:1.25rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;}
   .rta .lab{font-size:.72rem;font-weight:600;opacity:.9;line-height:1.15;}
 
@@ -187,14 +188,19 @@
   .assigned-cell input{width:96px;text-align:right;padding:5px 8px;border:1.5px solid var(--accent);border-radius:var(--r-sm);
     font-weight:600;font-variant-numeric:tabular-nums;outline:none;}
   .activity-cell{color:var(--ink-soft);font-weight:500;font-size:.88rem;}
-  /* income planning table: 6 columns (Source · Target · Billing · Due · Actual · Status), horizontally scrollable */
+  /* budget tables scroll horizontally so columns stay readable */
   .btable-scroll{overflow-x:auto;}
-  .btable.income{min-width:840px;}
-  .btable-scroll > .btable:not(.income){min-width:460px;}
+  /* income: Source · Target · Billing · Due date · Payment · Activity · Status */
+  .btable.income{min-width:900px;}
+  .btable.income .brow-h, .btable.income .cg-head, .btable.income .cat-row{grid-template-columns:minmax(170px,1.3fr) 110px 110px 110px 110px 110px 140px;}
+  /* spending: Category · Assigned · Billing · Due date · Payment · Activity · Available · Status */
+  .btable.spend{min-width:1000px;}
+  .btable.spend .brow-h, .btable.spend .cg-head, .btable.spend .cat-row{grid-template-columns:minmax(170px,1.3fr) 110px 110px 110px 110px 110px 120px 140px;}
   .assigned-cell .val.locked{cursor:default;color:var(--ink-soft);}
   .assigned-cell .val.locked:hover{background:transparent;border-color:transparent;box-shadow:none;}
-  .btable.income .brow-h, .btable.income .cg-head, .btable.income .cat-row{grid-template-columns:minmax(180px,1.4fr) 120px 130px 120px 120px 150px;}
-  .bill-cell{font-size:.82rem;color:var(--ink-soft);}
+  .bill-cell{font-size:.82rem;color:var(--ink-soft);cursor:pointer;}
+  .bill-cell:hover{color:var(--accent);}
+  .btable .c-act, .btable .activity-cell{display:block;}   /* keep activity column (tables scroll instead of dropping it) */
   .due-cell{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
   .due-cell .due-day{font-size:.8rem;color:var(--ink-soft);font-variant-numeric:tabular-nums;}
   .stat-badge{display:inline-block;padding:2px 9px;border-radius:var(--r-pill);font-size:.7rem;font-weight:700;white-space:nowrap;}
@@ -712,9 +718,11 @@ const I18N = {
     cat_root:'Categories', add_group:'Add Group', add_cat_full:'Add Category', add_sub_full:'Add Subcategory', actions:'Actions',
     cant_delete_txn:(n,d)=>`Can't delete — ${n} transaction${n===1?'':'s'} logged here${d?` (last on ${d})`:''}. Disable it instead.`,
     tab_spending:'Spending', tab_income:'Income', col_expected:'Expected', col_actual:'Actual', col_difference:'Difference', income_by_source:'Income by source',
-    col_target:'Target', col_due:'Due', col_status:'Status', col_billing:'Billing period',
+    col_target:'Target', col_due:'Due date', col_status:'Status', col_billing:'Billing period',
     st_due:'Due', st_pastdue:'Past due', st_overdue:'Overdue', st_paid:'Paid',
     st_awaited:'Awaited', st_less:'Less than expected', st_as:'As expected', st_more:'More than expected',
+    st_underfunded:'Underfunded', st_funded:'Funded', st_fullyspent:'Fully spent', st_overspent:'Overspent',
+    spend_target:'Bill / target',
     income_target:'Income target', target_amount:'Target (zł)', due_day:'Due day', frequency:'Frequency',
     freq_monthly:'Monthly', freq_yearly:'Yearly', freq_everyN:'Every N months', freq_once:'One-time',
     every_n_label:'Every (months)', apply_future:'Apply to following months', no_due:'No due day', clear_target:'Clear target'
@@ -794,6 +802,8 @@ const I18N = {
     col_target:'Cel', col_due:'Termin', col_status:'Status', col_billing:'Okres',
     st_due:'Do zapłaty', st_pastdue:'Po terminie', st_overdue:'Zaległe', st_paid:'Otrzymano',
     st_awaited:'Oczekiwane', st_less:'Mniej niż planowano', st_as:'Zgodnie z planem', st_more:'Więcej niż planowano',
+    st_underfunded:'Niedofinansowane', st_funded:'Sfinansowane', st_fullyspent:'W pełni wydane', st_overspent:'Przekroczone',
+    spend_target:'Rachunek / cel',
     income_target:'Cel przychodu', target_amount:'Cel (zł)', due_day:'Dzień terminu', frequency:'Częstotliwość',
     freq_monthly:'Co miesiąc', freq_yearly:'Co rok', freq_everyN:'Co N miesięcy', freq_once:'Jednorazowo',
     every_n_label:'Co (miesięcy)', apply_future:'Zastosuj do kolejnych miesięcy', no_due:'Brak terminu', clear_target:'Usuń cel'
@@ -949,6 +959,8 @@ function normalize(s){
   if(!Array.isArray(s.tags)) s.tags=[];
   if(!s.incomePlan||typeof s.incomePlan!=='object') s.incomePlan={};
   if(!s.incomeOverride||typeof s.incomeOverride!=='object') s.incomeOverride={};
+  if(!s.spendPlan||typeof s.spendPlan!=='object') s.spendPlan={};
+  if(!s.spendOverride||typeof s.spendOverride!=='object') s.spendOverride={};
   if(s.expected && typeof s.expected==='object'){    // migrate legacy per-month expected amounts → month overrides
     for(const [m,obj] of Object.entries(s.expected)) for(const [cid,v] of Object.entries(obj)){
       if(v){ (s.incomeOverride[m]=s.incomeOverride[m]||{}); if(!s.incomeOverride[m][cid]) s.incomeOverride[m][cid]={amount:v}; }
@@ -1174,41 +1186,52 @@ function ruleRecurs(rule, m){
   if(f==='everyN') return d%Math.max(1,rule.everyN||1)===0;
   return true;
 }
-// resolve the active income rule for a category in a month → {amount,dueDay,freq,everyN} or null
-function incomeRule(catId, m){
-  const ov=state.incomeOverride && state.incomeOverride[m] && state.incomeOverride[m][catId];
+// generic resolver: override wins, else latest matching effective-dated rule → {amount,dueDay,freq,everyN} or null
+function resolvePlan(plans, overrides, catId, m){
+  const ov=overrides && overrides[m] && overrides[m][catId];
   if(ov){ return ov.off ? null : {amount:ov.amount||0, dueDay:ov.dueDay||null, freq:'once'}; }
-  const rules=(state.incomePlan&&state.incomePlan[catId])||[];
+  const rules=(plans&&plans[catId])||[];
   let best=null;
   for(const r of rules){ if(ruleRecurs(r,m) && (!best || r.from>best.from)) best=r; }
   return best ? {amount:best.amount||0, dueDay:best.dueDay||null, freq:best.freq, everyN:best.everyN} : null;
 }
-// expected income = the resolved target amount (own share) for an income node in a month
-function expected(catId, mKey){ const r=incomeRule(catId,mKey); return r?r.amount:0; }
+function incomeRule(catId, m){ return resolvePlan(state.incomePlan, state.incomeOverride, catId, m); }
+function spendRule(catId, m){ return resolvePlan(state.spendPlan, state.spendOverride, catId, m); }
+// due date as dd/mm/yyyy for the viewed month (or '' when no due day)
+function fmtDueDate(m, dueDay){ if(!dueDay) return ''; const [y,mo,d]=clampDueDate(m,dueDay).split('-'); return `${d}/${mo}/${y}`; }
+// billing-period label for a rule
+function freqLabelOf(rule){ if(!rule||!rule.amount) return ''; const f=rule.freq||'monthly';
+  if(f==='yearly') return T('freq_yearly'); if(f==='once') return T('freq_once');
+  if(f==='everyN') return T('freq_everyN').replace(/N/,(rule.everyN||'?')); return T('freq_monthly'); }
+// payment lifecycle from a target rule + whether it's been settled
+function paymentStatusOf(rule, m, paid){ if(!rule||!rule.amount) return null; if(paid) return 'paid'; if(!rule.dueDay) return null;
+  const due=clampDueDate(m, rule.dueDay), today=todayISO(); if(today<due) return 'due'; return dayDiffISO(due,today)<=5 ? 'pastdue' : 'overdue'; }
+
+// ---- income wrappers ----
+function expected(catId, mKey){ const r=incomeRule(catId,mKey); return r?r.amount:0; }   // planned income (own share)
 function incomeDueDay(catId, mKey){ const r=incomeRule(catId,mKey); return r?r.dueDay:null; }
-// short billing-period label for a node's own rule in a month ('' when no target)
-function incomeFreqLabel(catId, mKey){ const r=incomeRule(catId,mKey); if(!r||!r.amount) return '';
-  const f=r.freq||'monthly';
-  if(f==='yearly') return T('freq_yearly');
-  if(f==='once') return T('freq_once');
-  if(f==='everyN') return T('freq_everyN').replace(/N/,(r.everyN||'?'));
-  return T('freq_monthly');
-}
-// payment status (did the money arrive vs its due date) — actual>0 ⇒ paid regardless of amount
-function incomePaymentStatus(catId, m){
-  const r=incomeRule(catId,m); if(!r||!r.amount) return null;
-  if(activity(catId,m)>0) return 'paid';
-  if(!r.dueDay) return null;                         // no due date to judge timing against
-  const due=clampDueDate(m, r.dueDay), today=todayISO();
-  if(today<due) return 'due';
-  return dayDiffISO(due,today)<=5 ? 'pastdue' : 'overdue';
-}
-// budgeting status (rolled target vs rolled actual)
+function incomeFreqLabel(catId, mKey){ return freqLabelOf(incomeRule(catId,mKey)); }
+function incomePaymentStatus(catId, m){ return paymentStatusOf(incomeRule(catId,m), m, activity(catId,m)>0); }
 function incomeBudgetStatus(node, m){
   const tgt=rolled(node,m,expected); if(!tgt) return null;
   const act=rolled(node,m,activity);
   if(act===0) return 'awaited';
   return act<tgt ? 'less' : act>tgt ? 'more' : 'as';
+}
+
+// ---- spending (bill/target) wrappers — display/status only, does NOT feed Ready-to-Assign ----
+function spendTarget(catId, mKey){ const r=spendRule(catId,mKey); return r?r.amount:0; }   // planned bill amount (own share)
+function spendDueDay(catId, mKey){ const r=spendRule(catId,mKey); return r?r.dueDay:null; }
+function spendFreqLabel(catId, mKey){ return freqLabelOf(spendRule(catId,mKey)); }
+function spendPaymentStatus(catId, m){ return paymentStatusOf(spendRule(catId,m), m, activity(catId,m)<0); }  // spent something ⇒ paid
+function spendBudgetStatus(node, m){
+  const avl=rolled(node,m,available);
+  if(avl<0) return 'overspent';
+  const tgt=rolled(node,m,spendTarget); if(!tgt) return null;
+  const asg=rolled(node,m,assigned), spent=-rolled(node,m,activity);
+  if(asg<tgt) return 'underfunded';
+  if(spent>0 && avl===0) return 'fullyspent';
+  return 'funded';
 }
 
 // cumulative available through selected month (rolls forward, incl. negatives)
@@ -1371,7 +1394,7 @@ function render(){
 function renderRTA(){
   const v=readyToAssign(); const p=document.getElementById('rtaPill');
   document.getElementById('rtaAmt').textContent=fmt(v);
-  p.className='rta '+(v>0?'pos':v<0?'neg':'zero');
+  p.className='rta '+(v>0?'pos':v<0?'neg':'zero')+(isPastMonth(ui.month)?' past':'');   // past months: greyed (view-only)
   p.style.cursor='pointer'; p.title=T('rta_tip'); p.onclick=openRtaBreakdown;
 }
 
@@ -1412,23 +1435,27 @@ function budgetView(){
   wrap.append(seg);
   seg.querySelectorAll('[data-bkind]').forEach(b=>b.onclick=()=>{ ui.budgetKind=b.dataset.bkind; if(ui.budgetKind==='income') ui.selCat=null; render(); });
   if(kind==='income'){ wrap.append(incomeTable()); return wrap; }
-  const t=document.createElement('div'); t.className='btable';
-  t.innerHTML=`<div class="brow-h"><div>${T('col_category')}</div><div class="num">${T('col_assigned')}</div><div class="num c-act">${T('col_activity')}</div><div class="num">${T('col_available')}</div></div>`;
+  const t=document.createElement('div'); t.className='btable spend';
+  t.innerHTML=`<div class="brow-h"><div>${T('col_category')}</div><div class="num">${T('col_assigned')}</div><div>${T('col_billing')}</div><div>${T('col_due')}</div><div></div><div class="num c-act">${T('col_activity')}</div><div class="num">${T('col_available')}</div><div>${T('col_status')}</div></div>`;
   const m=ui.month;
   const locked=isPastMonth(m);   // no assigning in past months
+  const badge=s=>s?`<span class="stat-badge ${s}">${T('st_'+s)}</span>`:'';
   const rowHtml=(node,level)=>{
     const kids=nodeKids(node), hasKids=kids.length>0, coll=!!ui.collapsed[node.id];
     // parent rows show the rolled-up total (own + everything beneath); leaves show their own (rolled === own)
     const a=rolled(node,m,assigned), act=rolled(node,m,activity), avl=rolled(node,m,available);
-    const ti=targetInfo(node,m);
-    let cls='zero'; if(avl<0)cls='neg'; else if(ti.state==='under'&&avl>=0)cls='under'; else if(avl>0)cls='pos';
-    const bar = ti.state!=='none' ? `<div class="tgt-bar ${ti.state==='under'?'under':''}"><i style="width:${ti.pct}%"></i></div>` : '';
+    let cls='zero'; if(avl<0)cls='neg'; else if(avl>0)cls='pos';
+    const dd=fmtDueDate(m, spendDueDay(node.id,m));
     const caret = hasKids ? `<span class="caret ${coll?'c':''}" data-caret="${node.id}">▼</span>` : `<span class="caret-sp"></span>`;
     return `<div class="cat-row lvl${level} ${hasKids?'is-parent':''} ${ui.selCat===node.id?'sel':''}" data-cat="${node.id}">
-      <div class="cat-name"><div class="nm">${caret}<span class="nm-txt">${node.name}</span></div>${bar}</div>
+      <div class="cat-name"><div class="nm">${caret}<span class="nm-txt">${node.name}</span></div></div>
       <div class="assigned-cell"><span class="val ${locked?'locked':''}" ${locked?'':`data-assign="${node.id}"`}>${fmt(a)}</span></div>
+      <div class="bill-cell" data-billedit="${node.id}">${spendFreqLabel(node.id,m)||'—'}</div>
+      <div class="due-cell" data-billedit="${node.id}">${dd||'—'}</div>
+      <div>${badge(spendPaymentStatus(node.id,m))}</div>
       <div class="num activity-cell">${act?fmt(act):'—'}</div>
       <div class="num"><span class="avail-pill ${cls}">${fmt(avl)}</span></div>
+      <div>${badge(spendBudgetStatus(node,m))}</div>
     </div>`;
   };
   state.groups.forEach(sec=>{
@@ -1455,11 +1482,12 @@ function budgetView(){
 
   // events
   wrap.querySelectorAll('.cat-row').forEach(r=>r.onclick=e=>{
-    if(e.target.closest('[data-assign]')) return;
+    if(e.target.closest('[data-assign]')||e.target.closest('[data-billedit]')) return;
     if(e.target.closest('[data-caret]')){ const id=e.target.closest('[data-caret]').dataset.caret; ui.collapsed[id]=!ui.collapsed[id]; render(); return; }
     ui.selCat=r.dataset.cat; render();
   });
   wrap.querySelectorAll('[data-assign]').forEach(el=>el.onclick=e=>{e.stopPropagation();editAssign(el);});
+  wrap.querySelectorAll('[data-billedit]').forEach(el=>el.onclick=e=>{e.stopPropagation();openSpendTarget(el.dataset.billedit);});
   wrap.querySelectorAll('[data-addcat]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAddCategory(b.dataset.addcat);});
   wrap.querySelectorAll('[data-addsub]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAddSub(b.dataset.addsub);});
   foot.querySelector('#addSectionBtn').onclick=()=>openAddGroup('expense');
@@ -1469,22 +1497,22 @@ function budgetView(){
 // Income forecast table: Expected / Actual / Difference, rolled up per month
 function incomeTable(){
   const t=document.createElement('div'); t.className='btable income';
-  t.innerHTML=`<div class="brow-h"><div>${T('income_by_source')}</div><div class="num">${T('col_target')}</div><div>${T('col_billing')}</div><div>${T('col_due')}</div><div class="num">${T('col_actual')}</div><div>${T('col_status')}</div></div>`;
+  t.innerHTML=`<div class="brow-h"><div>${T('income_by_source')}</div><div class="num">${T('col_target')}</div><div>${T('col_billing')}</div><div>${T('col_due')}</div><div></div><div class="num">${T('col_activity')}</div><div>${T('col_status')}</div></div>`;
   const m=ui.month;
-  const payBadge=id=>{ const s=incomePaymentStatus(id,m); return s?`<span class="stat-badge ${s}">${T('st_'+s)}</span>`:''; };
-  const budBadge=node=>{ const s=incomeBudgetStatus(node,m); return s?`<span class="stat-badge ${s}">${T('st_'+s)}</span>`:''; };
+  const badge=s=>s?`<span class="stat-badge ${s}">${T('st_'+s)}</span>`:'';
   const rowHtml=(node,level)=>{
     const kids=nodeKids(node), hasKids=kids.length>0, coll=!!ui.collapsed[node.id];
     const tgt=rolled(node,m,expected), act=rolled(node,m,activity);
-    const due=incomeDueDay(node.id,m);
+    const dd=fmtDueDate(m, incomeDueDay(node.id,m));
     const caret = hasKids ? `<span class="caret ${coll?'c':''}" data-caret="${node.id}">▼</span>` : `<span class="caret-sp"></span>`;
     return `<div class="cat-row lvl${level} ${hasKids?'is-parent':''}" data-cat="${node.id}">
       <div class="cat-name"><div class="nm">${caret}<span class="nm-txt">${node.name}</span></div></div>
       <div class="assigned-cell"><span class="val" data-target="${node.id}">${tgt?fmt(tgt):'—'}</span></div>
       <div class="bill-cell">${incomeFreqLabel(node.id,m)||'—'}</div>
-      <div class="due-cell">${due?`<span class="due-day">${due}</span>`:''}${payBadge(node.id)}</div>
+      <div class="due-cell">${dd||'—'}</div>
+      <div>${badge(incomePaymentStatus(node.id,m))}</div>
       <div class="num">${act?fmt(act):'—'}</div>
-      <div>${budBadge(node)}</div>
+      <div>${badge(incomeBudgetStatus(node,m))}</div>
     </div>`;
   };
   const root=incomeRoot();
@@ -1517,17 +1545,23 @@ function incomeTable(){
   const sc=document.createElement('div'); sc.className='btable-scroll'; sc.append(t); return sc;   // horizontal scroll so columns stay readable
 }
 
-// Income target editor: amount + due day + frequency + "apply to following months" (recurring rule vs one-month override)
-function openIncomeTarget(catId){
+// Target/bill editor (income OR spend): amount + due day + billing period + "apply to following months"
+function openIncomeTarget(catId){ openPlanTarget(catId,'income'); }
+function openSpendTarget(catId){ openPlanTarget(catId,'spend'); }
+function openPlanTarget(catId, kind){
   const m=ui.month, node=catById(catId); if(!node) return;
+  const income = kind==='income';
+  const plans = income?state.incomePlan:state.spendPlan;
+  const overrides = income?state.incomeOverride:state.spendOverride;
+  const expFn = income?expected:spendTarget;
   const kids=nodeKids(node);
-  const childSum=kids.filter(k=>!k.archived).reduce((s,k)=>s+rolled(k,m,expected),0);
-  const rule=incomeRule(catId,m)||{};
+  const childSum=kids.filter(k=>!k.archived).reduce((s,k)=>s+rolled(k,m,expFn),0);
+  const rule=(income?incomeRule:spendRule)(catId,m)||{};
   const shownAmt=childSum + (rule.amount||0);
   const grosz=g=>g?(g/100).toFixed(2).replace('.',','):'';
-  const isOverride = !!(state.incomeOverride && state.incomeOverride[m] && state.incomeOverride[m][catId]);
+  const isOverride = !!(overrides && overrides[m] && overrides[m][catId]);
   const freq = rule.freq || 'monthly';
-  openModal(`<div class="modal"><div class="modal-h"><h3>${T('income_target')} — ${escapeHtml(node.name)}</h3><button class="x" data-close>×</button></div>
+  openModal(`<div class="modal"><div class="modal-h"><h3>${income?T('income_target'):T('spend_target')} — ${escapeHtml(node.name)}</h3><button class="x" data-close>×</button></div>
     <div class="modal-b">
       <div class="tgt-txt" style="margin-bottom:10px">${escapeHtml(nodePathById(catId))} · ${keyToLabel(m)}</div>
       <div class="row2">
@@ -1552,12 +1586,12 @@ function openIncomeTarget(catId){
   $('#itFreq').onchange=()=>{ $('#itEveryField').style.display = $('#itFreq').value==='everyN'?'block':'none'; };
   const write=(own,dueDay,freqV,everyN,future)=>{
     if(future){
-      const rules=((state.incomePlan[catId]||[]).filter(r=>r.from!==m));   // replace any rule starting this month
+      const rules=((plans[catId]||[]).filter(r=>r.from!==m));   // replace any rule starting this month
       rules.push({from:m, amount:own, dueDay:dueDay||null, freq:freqV, ...(freqV==='everyN'?{everyN}:{})});
-      state.incomePlan[catId]=rules;
-      if(state.incomeOverride[m]) delete state.incomeOverride[m][catId];    // let the rule take effect this month
+      plans[catId]=rules;
+      if(overrides[m]) delete overrides[m][catId];              // let the rule take effect this month
     } else {
-      (state.incomeOverride[m]=state.incomeOverride[m]||{})[catId]={amount:own, dueDay:dueDay||null};
+      (overrides[m]=overrides[m]||{})[catId]={amount:own, dueDay:dueDay||null};
     }
     save(); closeModal(); render();
   };
@@ -1693,7 +1727,8 @@ function deleteCategory(nodeId){
   state.transactions.forEach(t=>{ if(ids.has(t.categoryId)) t.categoryId=null; });     // orphaned txns → uncategorized
   for(const mm of Object.values(state.assignments)) ids.forEach(id=>{ delete mm[id]; });  // drop assignments
   for(const mm of Object.values(state.incomeOverride||{})) ids.forEach(id=>{ delete mm[id]; }); // drop income overrides
-  ids.forEach(id=>{ if(state.incomePlan) delete state.incomePlan[id]; });                 // drop income recurring rules
+  for(const mm of Object.values(state.spendOverride||{})) ids.forEach(id=>{ delete mm[id]; });  // drop spend overrides
+  ids.forEach(id=>{ if(state.incomePlan) delete state.incomePlan[id]; if(state.spendPlan) delete state.spendPlan[id]; });
   ui.selCat=null; render();
 }
 function openAddSub(catId, index){
