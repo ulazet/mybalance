@@ -128,6 +128,8 @@
     display:flex;align-items:center;justify-content:center;}
   .monthnav button.arw:hover{background:var(--surface-2);color:var(--ink);}
   .monthnav .mlabel{font-size:1.05rem;font-weight:700;min-width:150px;text-align:center;letter-spacing:-.01em;text-transform:capitalize;}
+  .monthnav .today-btn{margin-left:4px;padding:5px 12px;border-radius:var(--r-pill);font-size:.8rem;font-weight:600;color:var(--ink-soft);border:1px solid var(--line);}
+  .monthnav .today-btn:hover{background:var(--surface-2);color:var(--ink);border-color:var(--ink-soft);}
   .topbar .spacer{flex:1;}
 
   /* Ready to assign pill */
@@ -588,6 +590,7 @@
       <button class="arw" id="prevM">‹</button>
       <div class="mlabel" id="mLabel">—</div>
       <button class="arw" id="nextM">›</button>
+      <button class="today-btn" id="todayM">Today</button>
     </div>
     <div class="spacer"></div>
     <div class="rta" id="rtaPill">
@@ -645,7 +648,7 @@ const I18N = {
     rta_check:'Check (should equal cash)', none:'None', close:'Close',
     rta_by_month:'Assigned by month', rta_orphan:'Orphaned assignments (deleted categories)', rta_purge:'Remove orphaned assignments',
     rta_purge_done:m=>`Removed ${m} of orphaned assignments`, this_month:'this month',
-    rta_carry_in:'Left over from previous month', rta_income:'Income this month', rta_assigned_month:'Assigned this month', rta_available:'Available to assign',
+    today_btn:'Today', rta_carry_in:'Left over from previous month', rta_income:'Income this month', rta_assigned_month:'Assigned this month', rta_available:'Available to assign',
     rta_income_actual:'actual', rta_income_expected:'expected', rta_income_maxeh:'expected or actual',
     rta_past_locked:'Past month — assigning is locked (view only).',
     rta_explain:'Available to assign = the previous month’s leftover + this month’s income − what you assigned this month. Leftovers roll into next month; future months use your expected income so you can plan ahead.',
@@ -724,7 +727,7 @@ const I18N = {
     rta_check:'Kontrola (= gotówka)', none:'Brak', close:'Zamknij',
     rta_by_month:'Rozdysponowano wg miesiąca', rta_orphan:'Osierocone przypisania (usunięte kategorie)', rta_purge:'Usuń osierocone przypisania',
     rta_purge_done:m=>`Usunięto osierocone przypisania: ${m}`, this_month:'w tym miesiącu',
-    rta_carry_in:'Pozostało z poprzedniego miesiąca', rta_income:'Przychód w tym miesiącu', rta_assigned_month:'Rozdysponowano w tym miesiącu', rta_available:'Do rozdysponowania',
+    today_btn:'Dziś', rta_carry_in:'Pozostało z poprzedniego miesiąca', rta_income:'Przychód w tym miesiącu', rta_assigned_month:'Rozdysponowano w tym miesiącu', rta_available:'Do rozdysponowania',
     rta_income_actual:'rzeczywisty', rta_income_expected:'oczekiwany', rta_income_maxeh:'oczekiwany lub rzeczywisty',
     rta_past_locked:'Miniony miesiąc — przypisywanie zablokowane (tylko podgląd).',
     rta_explain:'Do rozdysponowania = pozostałość z zeszłego miesiąca + przychód w tym miesiącu − rozdysponowane w tym miesiącu. Pozostałości przechodzą na kolejny miesiąc; przyszłe miesiące używają przychodu oczekiwanego, aby planować z wyprzedzeniem.',
@@ -815,7 +818,7 @@ function todayISO(){ const d=new Date(); return `${d.getFullYear()}-${String(d.g
 const parseAmt = s => { if(s==null) return 0; s=(''+s).replace(/\s/g,'').replace('zł','').replace(',','.'); const n=parseFloat(s); return isNaN(n)?0:Math.round(n*100); };
 
 const STORE = 'ynab_pl_budget_v1';
-let state, ui = { view:'dashboard', month:'2026-08', selCat:null, selAcct:'all', collapsed:{}, budgetKind:'spending', catKind:'expense' };
+let state, ui = { view:'dashboard', month:todayISO().slice(0,7), selCat:null, selAcct:'all', collapsed:{}, budgetKind:'spending', catKind:'expense' };
 let dragAcctId=null;
 let seqCounter=0;
 const nextSeq=()=>++seqCounter;
@@ -1331,6 +1334,7 @@ function setChrome(){
   if(g('rtaLab')) g('rtaLab').innerHTML=T('ready_to_assign');
   if(g('rtaPill')) g('rtaPill').title=T('rta_tip');
   if(g('addTxnLabel')) g('addTxnLabel').textContent=T('add_txn');
+  if(g('todayM')) g('todayM').textContent=T('today_btn');
   if(g('authIntro')) g('authIntro').textContent=T('auth_intro');
   if(g('authEmail')) g('authEmail').placeholder=T('auth_email_ph');
   const ab=g('authBtn'); if(ab && !ab.disabled) ab.textContent=T('auth_send');
@@ -1596,6 +1600,7 @@ function inspectorView(){
   el.classList.add('sheet-open');
   const avl=rolled(c,ui.month,available), ti=targetInfo(c,ui.month);
   const cls=avl<0?'red':avl>0?'green':'';
+  const locked=isPastMonth(ui.month);   // no moving money in past months
   const otherCats=allCats().filter(x=>x.id!==c.id);
   el.innerHTML=`
     <div class="sheet-close"><button data-sheetclose>✕</button></div>
@@ -1617,7 +1622,7 @@ function inspectorView(){
       ${ti.state!=='none'?`<div class="tgt-txt" style="margin-top:8px">${ti.state==='funded'?T('target_met'):T('target_short',fmt(ti.needed-ti.funded))}</div>`:''}
     </div>
 
-    <div class="insp-sec">
+    ${locked ? `<div class="insp-sec"><h4>${T('move_money')}</h4><div class="tgt-txt">${T('rta_past_locked')}</div></div>` : `<div class="insp-sec">
       <h4>${T('move_money')}</h4>
       <div class="row2">
         <div class="field"><label>${T('amount')}</label><input id="mvAmt" type="text" placeholder="0,00"></div>
@@ -1627,7 +1632,7 @@ function inspectorView(){
       <div class="field"><label>${T('other_category')}</label>
         <select id="mvCat"><option value="__rta__">${T('rta_opt')}</option>${otherCats.map(x=>`<option value="${x.id}">${x.path}</option>`).join('')}</select></div>
       <button class="mini-btn ghost" id="doMove">${T('move')}</button>
-    </div>
+    </div>`}
     <a class="link-btn" id="delCat">${T('delete_category')}</a>`;
 
   const scBtn=el.querySelector('[data-sheetclose]'); if(scBtn) scBtn.onclick=()=>{ui.selCat=null;render();};
@@ -1638,7 +1643,9 @@ function inspectorView(){
     else c.target={type,amount:parseAmt(el.querySelector('#tgtAmt').value)};
     toast(T('target_saved')); render();
   };
-  el.querySelector('#doMove').onclick=()=>{
+  const mvBtn=el.querySelector('#doMove');
+  if(mvBtn) mvBtn.onclick=()=>{
+    if(isPastMonth(ui.month)) return;
     const amt=parseAmt(el.querySelector('#mvAmt').value); if(!amt){toast(T('enter_amount'));return;}
     const dir=el.querySelector('#mvDir').value, other=el.querySelector('#mvCat').value;
     moveMoney(c.id, other, amt, dir); toast(T('moved',fmt(amt))); render();
@@ -1649,6 +1656,7 @@ function inspectorView(){
 
 // move by adjusting current-month assignments; RTA is virtual (not stored) so moving to/from RTA just changes this cat's assignment
 function moveMoney(catId, otherId, amt, dir){
+  if(isPastMonth(ui.month)) return;   // no reassigning in past months
   if(!state.assignments[ui.month]) state.assignments[ui.month]={};
   const m=state.assignments[ui.month];
   const add=(id,delta)=>{ if(id===RTA())return; m[id]=(m[id]||0)+delta; };
@@ -2701,6 +2709,7 @@ function shiftMonth(delta){
 }
 document.getElementById('prevM').onclick=()=>shiftMonth(-1);
 document.getElementById('nextM').onclick=()=>shiftMonth(1);
+document.getElementById('todayM').onclick=()=>{ ui.month=currentMonthKey(); ui.selCat=null; render(); };
 document.getElementById('addTxnBtn').onclick=openAddTxn;
 document.getElementById('rtaPill').onclick=autoAssignTargets;
 // mobile drawer (hamburger) + backdrop
