@@ -185,8 +185,14 @@
   .assigned-cell input{width:96px;text-align:right;padding:5px 8px;border:1.5px solid var(--accent);border-radius:var(--r-sm);
     font-weight:600;font-variant-numeric:tabular-nums;outline:none;}
   .activity-cell{color:var(--ink-soft);font-weight:500;font-size:.88rem;}
-  /* income planning table: 5 columns (Source · Target · Due · Actual · Status) */
-  .btable.income .brow-h, .btable.income .cg-head, .btable.income .cat-row{grid-template-columns:1fr 116px 130px 116px 150px;}
+  /* income planning table: 6 columns (Source · Target · Billing · Due · Actual · Status), horizontally scrollable */
+  .btable-scroll{overflow-x:auto;}
+  .btable.income{min-width:840px;}
+  .btable-scroll > .btable:not(.income){min-width:460px;}
+  .assigned-cell .val.locked{cursor:default;color:var(--ink-soft);}
+  .assigned-cell .val.locked:hover{background:transparent;border-color:transparent;box-shadow:none;}
+  .btable.income .brow-h, .btable.income .cg-head, .btable.income .cat-row{grid-template-columns:minmax(180px,1.4fr) 120px 130px 120px 120px 150px;}
+  .bill-cell{font-size:.82rem;color:var(--ink-soft);}
   .due-cell{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
   .due-cell .due-day{font-size:.8rem;color:var(--ink-soft);font-variant-numeric:tabular-nums;}
   .stat-badge{display:inline-block;padding:2px 9px;border-radius:var(--r-pill);font-size:.7rem;font-weight:700;white-space:nowrap;}
@@ -638,8 +644,11 @@ const I18N = {
     rta_reserved:'Reserved in categories', rta_uncat:'Uncategorized / debt', rta_overspent:'Overspent categories',
     rta_check:'Check (should equal cash)', none:'None', close:'Close',
     rta_by_month:'Assigned by month', rta_orphan:'Orphaned assignments (deleted categories)', rta_purge:'Remove orphaned assignments',
-    rta_purge_done:m=>`Removed ${m} of orphaned assignments`,
-    rta_explain:'Ready to Assign = inflows − assigned. It does NOT subtract spending, so it can exceed your cash when categories are overspent or you have uncategorized/debt outflows — that money is already spent but still shows as unassigned.',
+    rta_purge_done:m=>`Removed ${m} of orphaned assignments`, this_month:'this month',
+    rta_carry_in:'Left over from previous month', rta_income:'Income this month', rta_assigned_month:'Assigned this month', rta_available:'Available to assign',
+    rta_income_actual:'actual', rta_income_expected:'expected', rta_income_maxeh:'expected or actual',
+    rta_past_locked:'Past month — assigning is locked (view only).',
+    rta_explain:'Available to assign = the previous month’s leftover + this month’s income − what you assigned this month. Leftovers roll into next month; future months use your expected income so you can plan ahead.',
     add_txn:'Transaction',
     nav_dashboard:'Dashboard', nav_budget:'Budget', nav_transactions:'Transactions', nav_accounts:'Accounts', nav_reports:'Reports', nav_more:'More',
     on_budget:'On-budget', tracking:'Tracking', add_account:'+ Add account', net_worth:'Net worth',
@@ -700,7 +709,7 @@ const I18N = {
     cat_root:'Categories', add_group:'Add Group', add_cat_full:'Add Category', add_sub_full:'Add Subcategory', actions:'Actions',
     cant_delete_txn:(n,d)=>`Can't delete — ${n} transaction${n===1?'':'s'} logged here${d?` (last on ${d})`:''}. Disable it instead.`,
     tab_spending:'Spending', tab_income:'Income', col_expected:'Expected', col_actual:'Actual', col_difference:'Difference', income_by_source:'Income by source',
-    col_target:'Target', col_due:'Due', col_status:'Status',
+    col_target:'Target', col_due:'Due', col_status:'Status', col_billing:'Billing period',
     st_due:'Due', st_pastdue:'Past due', st_overdue:'Overdue', st_paid:'Paid',
     st_awaited:'Awaited', st_less:'Less than expected', st_as:'As expected', st_more:'More than expected',
     income_target:'Income target', target_amount:'Target (zł)', due_day:'Due day', frequency:'Frequency',
@@ -714,8 +723,11 @@ const I18N = {
     rta_reserved:'Zarezerwowane w kategoriach', rta_uncat:'Bez kategorii / dług', rta_overspent:'Przekroczone kategorie',
     rta_check:'Kontrola (= gotówka)', none:'Brak', close:'Zamknij',
     rta_by_month:'Rozdysponowano wg miesiąca', rta_orphan:'Osierocone przypisania (usunięte kategorie)', rta_purge:'Usuń osierocone przypisania',
-    rta_purge_done:m=>`Usunięto osierocone przypisania: ${m}`,
-    rta_explain:'Do rozdysponowania = wpływy − rozdysponowane. NIE odejmuje wydatków, więc może przekroczyć gotówkę, gdy kategorie są przekroczone lub masz wydatki bez kategorii/dług — te pieniądze są już wydane, ale wciąż pokazują się jako nieprzypisane.',
+    rta_purge_done:m=>`Usunięto osierocone przypisania: ${m}`, this_month:'w tym miesiącu',
+    rta_carry_in:'Pozostało z poprzedniego miesiąca', rta_income:'Przychód w tym miesiącu', rta_assigned_month:'Rozdysponowano w tym miesiącu', rta_available:'Do rozdysponowania',
+    rta_income_actual:'rzeczywisty', rta_income_expected:'oczekiwany', rta_income_maxeh:'oczekiwany lub rzeczywisty',
+    rta_past_locked:'Miniony miesiąc — przypisywanie zablokowane (tylko podgląd).',
+    rta_explain:'Do rozdysponowania = pozostałość z zeszłego miesiąca + przychód w tym miesiącu − rozdysponowane w tym miesiącu. Pozostałości przechodzą na kolejny miesiąc; przyszłe miesiące używają przychodu oczekiwanego, aby planować z wyprzedzeniem.',
     add_txn:'Transakcja',
     nav_dashboard:'Pulpit', nav_budget:'Budżet', nav_transactions:'Transakcje', nav_accounts:'Konta', nav_reports:'Raporty', nav_more:'Więcej',
     on_budget:'Budżetowe', tracking:'Śledzone', add_account:'+ Dodaj konto', net_worth:'Wartość netto',
@@ -776,7 +788,7 @@ const I18N = {
     cat_root:'Kategorie', add_group:'Dodaj grupę', add_cat_full:'Dodaj kategorię', add_sub_full:'Dodaj podkategorię', actions:'Akcje',
     cant_delete_txn:(n,d)=>`Nie można usunąć — zapisano tu ${n} transakcj${n===1?'ę':'i'}${d?` (ostatnia ${d})`:''}. Zamiast tego wyłącz.`,
     tab_spending:'Wydatki', tab_income:'Przychody', col_expected:'Oczekiwane', col_actual:'Rzeczywiste', col_difference:'Różnica', income_by_source:'Przychody wg źródła',
-    col_target:'Cel', col_due:'Termin', col_status:'Status',
+    col_target:'Cel', col_due:'Termin', col_status:'Status', col_billing:'Okres',
     st_due:'Do zapłaty', st_pastdue:'Po terminie', st_overdue:'Zaległe', st_paid:'Otrzymano',
     st_awaited:'Oczekiwane', st_less:'Mniej niż planowano', st_as:'Zgodnie z planem', st_more:'Więcej niż planowano',
     income_target:'Cel przychodu', target_amount:'Cel (zł)', due_day:'Dzień terminu', frequency:'Częstotliwość',
@@ -1171,6 +1183,14 @@ function incomeRule(catId, m){
 // expected income = the resolved target amount (own share) for an income node in a month
 function expected(catId, mKey){ const r=incomeRule(catId,mKey); return r?r.amount:0; }
 function incomeDueDay(catId, mKey){ const r=incomeRule(catId,mKey); return r?r.dueDay:null; }
+// short billing-period label for a node's own rule in a month ('' when no target)
+function incomeFreqLabel(catId, mKey){ const r=incomeRule(catId,mKey); if(!r||!r.amount) return '';
+  const f=r.freq||'monthly';
+  if(f==='yearly') return T('freq_yearly');
+  if(f==='once') return T('freq_once');
+  if(f==='everyN') return T('freq_everyN').replace(/N/,(r.everyN||'?'));
+  return T('freq_monthly');
+}
 // payment status (did the money arrive vs its due date) — actual>0 ⇒ paid regardless of amount
 function incomePaymentStatus(catId, m){
   const r=incomeRule(catId,m); if(!r||!r.amount) return null;
@@ -1200,88 +1220,64 @@ function available(catId, mKey){
   for(const k of monthsUpTo(mKey)) sum += assigned(catId,k) + activity(catId,k);
   return sum;
 }
-// Ready to Assign = all inflows to RTA − all money assigned (all months)
-function readyToAssign(){
-  const inc = incomeIdSet();
-  const inflow = state.transactions.filter(t=>t.categoryId===RTA()||inc.has(t.categoryId)).reduce((s,t)=>s+t.amount,0);
-  let assignedTotal=0;
-  for(const m of Object.values(state.assignments)) for(const v of Object.values(m)) assignedTotal+=v;
-  return inflow - assignedTotal;
+/* ---- PER-MONTH budgeting: each month's "Available to assign" = carry-in + income − assigned ---- */
+const currentMonthKey = () => todayISO().slice(0,7);
+function nextMonthKey(m){ const [y,mo]=m.split('-').map(Number); const d=new Date(y,mo,1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+// actual income received in a month (RTA-keyed inflows + income-node transactions, incl. starting balances)
+function incomeActual(m){ const inc=incomeIdSet(); return state.transactions.filter(t=>txnMonth(t)===m && (t.categoryId===RTA()||inc.has(t.categoryId))).reduce((s,t)=>s+t.amount,0); }
+// planned income for a month = Σ of every income node's target
+function incomeExpectedTotal(m){ let s=0; eachNodeIn(incomeRoot(), n=>{ s+=expected(n.id,m); }); return s; }
+// income basis that becomes assignable: past = actual, current = max(expected,actual), future = expected
+function incomeBasis(m){ const cur=currentMonthKey(); if(m<cur) return incomeActual(m); if(m>cur) return incomeExpectedTotal(m); return Math.max(incomeExpectedTotal(m), incomeActual(m)); }
+function assignedTotalMonth(m){ const o=state.assignments[m]||{}; let s=0; for(const v of Object.values(o)) s+=v; return s; }
+function earliestBudgetMonth(){
+  let min=null; const upd=k=>{ if(k && (!min||k<min)) min=k; };
+  state.transactions.forEach(t=>upd(txnMonth(t)));
+  Object.keys(state.assignments||{}).forEach(upd);
+  Object.keys(state.incomeOverride||{}).forEach(upd);
+  for(const arr of Object.values(state.incomePlan||{})) (arr||[]).forEach(r=>upd(r.from));
+  return min || currentMonthKey();
 }
+// "Available to assign" at the end of month m = leftover carried in + income(m) − assigned(m); leftovers roll forward
+function readyToAssignMonth(m){
+  let cur=earliestBudgetMonth(); if(m<cur) cur=m;
+  let carry=0;
+  for(let guard=0; guard<600; guard++){
+    const end = carry + incomeBasis(cur) - assignedTotalMonth(cur);
+    if(cur===m) return end;
+    carry=end; cur=nextMonthKey(cur);
+    if(cur>m) return carry;
+  }
+  return carry;
+}
+// header/pill uses the currently-viewed month
+function readyToAssign(){ return readyToAssignMonth(ui.month); }
+const isPastMonth = m => m < currentMonthKey();
 function netWorth(){ return state.accounts.reduce((s,a)=>s+acctBalance(a.id),0); }
-// Itemise how Ready to Assign is built, and reconcile it against the real on-budget cash.
-function rtaBreakdown(){
-  const inc=incomeIdSet();
-  const src={}; let inflow=0;
-  state.transactions.forEach(t=>{
-    let label=null;
-    if(t.categoryId===RTA()) label = t.starting ? T('starting_balance_payee') : (t.payee||T('pill_income'));
-    else if(inc.has(t.categoryId)) label = nodePathById(t.categoryId)||T('pill_income');
-    if(label!==null){ src[label]=(src[label]||0)+t.amount; inflow+=t.amount; }
-  });
-  let assigned=0, future=0, orphan=0; const byMonth={}; const orphanList=[];
-  for(const [m,obj] of Object.entries(state.assignments||{})) for(const [cid,v] of Object.entries(obj)){
-    assigned+=v; if(m>ui.month) future+=v; byMonth[m]=(byMonth[m]||0)+v;
-    if(!catById(cid)){ orphan+=v; orphanList.push({id:cid,m,amt:v}); }   // assignment on a category that no longer exists
-  }
-  const rta=inflow-assigned;
-  const onBudgetCash = state.accounts.filter(a=>a.onBudget).reduce((s,a)=>s+acctBalance(a.id),0);
-  // latest month present (assignments feed available cumulatively)
-  let latest=ui.month; state.transactions.forEach(t=>{ if(txnMonth(t)>latest) latest=txnMonth(t); });
-  Object.keys(state.assignments||{}).forEach(k=>{ if(k>latest) latest=k; });
-  // reserved = Σ available across expense sections (rolled); overspent = sections whose rolled available < 0
-  let reserved=0; const overspent=[];
-  (state.groups||[]).forEach(sec=>{ const avl=rolled(sec,latest,available); reserved+=avl; if(avl<0) overspent.push({name:sec.name,amt:avl}); });
-  // uncategorized / debt: real money on on-budget accounts with no category (excl. internal pocket earmarks)
-  const onBudgetIds=new Set(state.accounts.filter(a=>a.onBudget).map(a=>a.id));
-  let uncat=0;
-  state.transactions.forEach(t=>{ if(onBudgetIds.has(t.accountId) && t.type!=='pocket' && !t.categoryId) uncat+=t.amount; });
-  return {inflow, src, assigned, future, rta, onBudgetCash, reserved, overspent, uncat, byMonth, orphan, orphanList};
-}
-// remove assignments that point at categories which no longer exist (frees up Ready to Assign)
-function purgeOrphanAssignments(){
-  let removed=0;
-  for(const obj of Object.values(state.assignments||{})) for(const cid of Object.keys(obj)){
-    if(!catById(cid)){ removed+=obj[cid]; delete obj[cid]; }
-  }
-  save(); return removed;
-}
+// Per-month breakdown of "Available to assign": carry-in + income − assigned = available.
 function openRtaBreakdown(){
-  const b=rtaBreakdown();
-  const inflowRows=Object.entries(b.src).sort((x,y)=>y[1]-x[1])
-    .map(([k,v])=>`<div class="rb-row"><span>${escapeHtml(k)}</span><span class="rb-amt">${fmt(v)}</span></div>`).join('')
-    || `<div class="rb-row"><span style="color:var(--ink-soft)">${T('none')}</span></div>`;
-  const overRows=b.overspent.length
-    ? b.overspent.map(o=>`<div class="rb-row"><span>${escapeHtml(o.name)}</span><span class="rb-amt neg">${fmt(o.amt)}</span></div>`).join('')
-    : `<div class="rb-row"><span style="color:var(--ink-soft)">${T('none')}</span></div>`;
-  const checkSum=b.rta+b.reserved+b.uncat, ok=Math.abs(checkSum-b.onBudgetCash)<1;
-  const months=Object.keys(b.byMonth).sort();
-  const monthRows = months.length>1 ? `<div class="rb-sub">${T('rta_by_month')}</div>`+
-    months.map(m=>`<div class="rb-row"><span>${m}</span><span class="rb-amt">${fmt(b.byMonth[m])}</span></div>`).join('') : '';
-  const orphanBlock = b.orphan ? `<div class="rb-sec-h" style="margin-top:16px;color:var(--red)">⚠ ${T('rta_orphan')}</div>
-      <div class="rb-row"><span style="color:var(--ink-soft)">${b.orphanList.length} ${b.orphanList.length===1?'entry':'entries'}</span><span class="rb-amt neg">${fmt(b.orphan)}</span></div>
-      <button class="btn" id="rbPurge" style="margin:8px 0 4px">${T('rta_purge')}</button>` : '';
-  openModal(`<div class="modal"><div class="modal-h"><h3>${T('rta_breakdown_title')}</h3><button class="x" data-close>×</button></div>
-    <div class="modal-b" style="max-height:62vh;overflow:auto">
-      <div class="rb-sec-h">${T('rta_inflows')}</div>
-      ${inflowRows}
-      <div class="rb-row total"><span>${T('rta_inflows')}</span><span class="rb-amt">${fmt(b.inflow)}</span></div>
-      <div class="rb-row"><span>${T('rta_assigned')}${b.future?` <span style="color:var(--ink-soft);font-size:.82em">(${T('rta_future_note')}: ${fmt(b.future)})</span>`:''}</span><span class="rb-amt">−${fmt(b.assigned)}</span></div>
-      ${monthRows}
-      <div class="rb-row total big"><span>${T('ready_to_assign').replace('<br>',' ')}</span><span class="rb-amt ${b.rta<0?'neg':''}">${fmt(b.rta)}</span></div>
-      ${orphanBlock}
-      <div class="rb-sec-h" style="margin-top:16px">${T('rta_reconcile')}</div>
-      <div class="rb-row"><span>${T('rta_onbudget_cash')}</span><span class="rb-amt">${fmt(b.onBudgetCash)}</span></div>
-      <div class="rb-row"><span>${T('rta_reserved')}</span><span class="rb-amt">${fmt(b.reserved)}</span></div>
-      <div class="rb-row"><span>${T('rta_uncat')}</span><span class="rb-amt ${b.uncat<0?'neg':''}">${fmt(b.uncat)}</span></div>
-      <div class="rb-sub">${T('rta_overspent')}</div>
-      ${overRows}
-      <div class="rb-row total"><span>${T('rta_check')}</span><span class="rb-amt ${ok?'':'neg'}">${fmt(checkSum)} ${ok?'✓':'⚠'}</span></div>
+  const m=ui.month, prev=(function(){ let c=earliestBudgetMonth(); if(m<=c) return null; let p=c; while(nextMonthKey(p)<m) p=nextMonthKey(p); return p; })();
+  const carry = m<=earliestBudgetMonth() ? 0 : readyToAssignMonth(prev);
+  const cur=currentMonthKey();
+  const basis = incomeBasis(m);
+  const basisLabel = m<cur ? T('rta_income_actual') : m>cur ? T('rta_income_expected') : T('rta_income_maxeh');
+  const assignedM = assignedTotalMonth(m);
+  const avail = readyToAssignMonth(m);
+  const orphan = (function(){ let o=0; const obj=state.assignments[m]||{}; for(const[c,v]of Object.entries(obj)) if(!catById(c)) o+=v; return o; })();
+  openModal(`<div class="modal"><div class="modal-h"><h3>${T('rta_breakdown_title')} — ${keyToLabel(m)}</h3><button class="x" data-close>×</button></div>
+    <div class="modal-b">
+      <div class="rb-row"><span>${T('rta_carry_in')}</span><span class="rb-amt ${carry<0?'neg':''}">${fmt(carry)}</span></div>
+      <div class="rb-row"><span>${T('rta_income')} <span style="color:var(--ink-soft);font-size:.82em">(${basisLabel})</span></span><span class="rb-amt">${fmt(basis)}</span></div>
+      <div class="rb-row"><span>${T('rta_assigned_month')}</span><span class="rb-amt">−${fmt(assignedM)}</span></div>
+      <div class="rb-row total big"><span>${T('rta_available')}</span><span class="rb-amt ${avail<0?'neg':''}">${fmt(avail)}</span></div>
+      ${isPastMonth(m)?`<div class="tgt-txt" style="margin-top:10px">${T('rta_past_locked')}</div>`:''}
+      ${orphan?`<div class="rb-sec-h" style="margin-top:16px;color:var(--red)">⚠ ${T('rta_orphan')}</div>
+        <div class="rb-row"><span style="color:var(--ink-soft)">${fmt(orphan)} ${T('this_month')}</span><button class="btn" id="rbPurge" style="padding:4px 10px">${T('rta_purge')}</button></div>`:''}
       <div class="tgt-txt" style="margin-top:12px">${T('rta_explain')}</div>
     </div>
     <div class="modal-f"><button class="btn" data-close>${T('close')}</button></div></div>`);
   const pg=modalHost.querySelector('#rbPurge');
-  if(pg) pg.onclick=()=>{ const removed=purgeOrphanAssignments(); toast(T('rta_purge_done', fmt(removed))); closeModal(); render(); };
+  if(pg) pg.onclick=()=>{ const obj=state.assignments[m]||{}; let r=0; for(const c of Object.keys(obj)) if(!catById(c)){ r+=obj[c]; delete obj[c]; } save(); toast(T('rta_purge_done', fmt(r))); closeModal(); render(); };
 }
 
 /* target progress: returns {needed, funded, pct, state:'funded'|'under'|'none'} */
@@ -1415,6 +1411,7 @@ function budgetView(){
   const t=document.createElement('div'); t.className='btable';
   t.innerHTML=`<div class="brow-h"><div>${T('col_category')}</div><div class="num">${T('col_assigned')}</div><div class="num c-act">${T('col_activity')}</div><div class="num">${T('col_available')}</div></div>`;
   const m=ui.month;
+  const locked=isPastMonth(m);   // no assigning in past months
   const rowHtml=(node,level)=>{
     const kids=nodeKids(node), hasKids=kids.length>0, coll=!!ui.collapsed[node.id];
     // parent rows show the rolled-up total (own + everything beneath); leaves show their own (rolled === own)
@@ -1425,7 +1422,7 @@ function budgetView(){
     const caret = hasKids ? `<span class="caret ${coll?'c':''}" data-caret="${node.id}">▼</span>` : `<span class="caret-sp"></span>`;
     return `<div class="cat-row lvl${level} ${hasKids?'is-parent':''} ${ui.selCat===node.id?'sel':''}" data-cat="${node.id}">
       <div class="cat-name"><div class="nm">${caret}<span class="nm-txt">${node.name}</span></div>${bar}</div>
-      <div class="assigned-cell"><span class="val" data-assign="${node.id}">${fmt(a)}</span></div>
+      <div class="assigned-cell"><span class="val ${locked?'locked':''}" ${locked?'':`data-assign="${node.id}"`}>${fmt(a)}</span></div>
       <div class="num activity-cell">${act?fmt(act):'—'}</div>
       <div class="num"><span class="avail-pill ${cls}">${fmt(avl)}</span></div>
     </div>`;
@@ -1446,7 +1443,8 @@ function budgetView(){
     }
     const secEl=document.createElement('div'); secEl.className='cat-group'; secEl.innerHTML=html; t.append(secEl);
   });
-  wrap.append(t);
+  if(locked){ const h=document.createElement('div'); h.className='tgt-txt'; h.style.margin='0 0 8px'; h.textContent=T('rta_past_locked'); wrap.append(h); }
+  const sc=document.createElement('div'); sc.className='btable-scroll'; sc.append(t); wrap.append(sc);
   const foot=document.createElement('div'); foot.className='table-foot';
   foot.innerHTML=`<button class="btn ghost" id="addSectionBtn">${T('add_section')}</button>`;
   wrap.append(foot);
@@ -1467,7 +1465,7 @@ function budgetView(){
 // Income forecast table: Expected / Actual / Difference, rolled up per month
 function incomeTable(){
   const t=document.createElement('div'); t.className='btable income';
-  t.innerHTML=`<div class="brow-h"><div>${T('income_by_source')}</div><div class="num">${T('col_target')}</div><div>${T('col_due')}</div><div class="num">${T('col_actual')}</div><div>${T('col_status')}</div></div>`;
+  t.innerHTML=`<div class="brow-h"><div>${T('income_by_source')}</div><div class="num">${T('col_target')}</div><div>${T('col_billing')}</div><div>${T('col_due')}</div><div class="num">${T('col_actual')}</div><div>${T('col_status')}</div></div>`;
   const m=ui.month;
   const payBadge=id=>{ const s=incomePaymentStatus(id,m); return s?`<span class="stat-badge ${s}">${T('st_'+s)}</span>`:''; };
   const budBadge=node=>{ const s=incomeBudgetStatus(node,m); return s?`<span class="stat-badge ${s}">${T('st_'+s)}</span>`:''; };
@@ -1479,6 +1477,7 @@ function incomeTable(){
     return `<div class="cat-row lvl${level} ${hasKids?'is-parent':''}" data-cat="${node.id}">
       <div class="cat-name"><div class="nm">${caret}<span class="nm-txt">${node.name}</span></div></div>
       <div class="assigned-cell"><span class="val" data-target="${node.id}">${tgt?fmt(tgt):'—'}</span></div>
+      <div class="bill-cell">${incomeFreqLabel(node.id,m)||'—'}</div>
       <div class="due-cell">${due?`<span class="due-day">${due}</span>`:''}${payBadge(node.id)}</div>
       <div class="num">${act?fmt(act):'—'}</div>
       <div>${budBadge(node)}</div>
@@ -1511,7 +1510,7 @@ function incomeTable(){
   t.querySelectorAll('[data-addcat]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAddCategory(b.dataset.addcat);});
   t.querySelectorAll('[data-addsub]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAddSub(b.dataset.addsub);});
   foot.querySelector('#addIncSectionBtn').onclick=()=>openAddGroup('income');
-  return t;
+  const sc=document.createElement('div'); sc.className='btable-scroll'; sc.append(t); return sc;   // horizontal scroll so columns stay readable
 }
 
 // Income target editor: amount + due day + frequency + "apply to following months" (recurring rule vs one-month override)
