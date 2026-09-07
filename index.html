@@ -207,8 +207,10 @@
   .stat-badge.due{background:#e9eefb;color:#3455b5;}
   .stat-badge.pastdue,.stat-badge.less{background:var(--yellow-bg);color:var(--yellow);}
   .stat-badge.overdue{background:var(--red-bg);color:var(--red);}
-  .stat-badge.paid,.stat-badge.as,.stat-badge.more{background:var(--green-bg);color:var(--green);}
+  .stat-badge.paid,.stat-badge.as,.stat-badge.more,.stat-badge.funded,.stat-badge.fullyspent{background:var(--green-bg);color:var(--green);}
   .stat-badge.awaited{background:var(--grey-bg);color:var(--grey-fg);}
+  .stat-badge.underfunded,.stat-badge.overspent{background:var(--red-bg);color:var(--red);}
+  .stat-badge.overfunded{background:#e9eefb;color:#3455b5;}
   .chk-row{display:flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer;margin-top:4px;}
   .avail-pill{display:inline-block;padding:5px 11px;border-radius:var(--r-pill);font-weight:700;font-size:.86rem;
     font-variant-numeric:tabular-nums;min-width:78px;text-align:center;}
@@ -721,9 +723,10 @@ const I18N = {
     col_target:'Target', col_due:'Due date', col_status:'Status', col_billing:'Billing period',
     st_due:'Due', st_pastdue:'Past due', st_overdue:'Overdue', st_paid:'Paid',
     st_awaited:'Awaited', st_less:'Less than expected', st_as:'As expected', st_more:'More than expected',
-    st_underfunded:'Underfunded', st_funded:'Funded', st_fullyspent:'Fully spent', st_overspent:'Overspent',
-    spend_target:'Bill / target',
-    income_target:'Income target', target_amount:'Target (zł)', due_day:'Due day', frequency:'Frequency',
+    st_underfunded:'Underfunded', st_overfunded:'Overfunded', st_funded:'Funded', st_fullyspent:'Fully spent', st_overspent:'Overspent',
+    assign_capped:'Assigned capped to available funds',
+    spend_target:'Assigned',
+    income_target:'Income target', target_amount:'Target (zł)', assigned_amount:'Assigned (zł)', due_day:'Due day', frequency:'Frequency',
     freq_monthly:'Monthly', freq_yearly:'Yearly', freq_everyN:'Every N months', freq_once:'One-time',
     every_n_label:'Every (months)', apply_future:'Apply to following months', no_due:'No due day', clear_target:'Clear target'
   },
@@ -802,9 +805,10 @@ const I18N = {
     col_target:'Cel', col_due:'Termin', col_status:'Status', col_billing:'Okres',
     st_due:'Do zapłaty', st_pastdue:'Po terminie', st_overdue:'Zaległe', st_paid:'Otrzymano',
     st_awaited:'Oczekiwane', st_less:'Mniej niż planowano', st_as:'Zgodnie z planem', st_more:'Więcej niż planowano',
-    st_underfunded:'Niedofinansowane', st_funded:'Sfinansowane', st_fullyspent:'W pełni wydane', st_overspent:'Przekroczone',
-    spend_target:'Rachunek / cel',
-    income_target:'Cel przychodu', target_amount:'Cel (zł)', due_day:'Dzień terminu', frequency:'Częstotliwość',
+    st_underfunded:'Niedofinansowane', st_overfunded:'Nadfinansowane', st_funded:'Sfinansowane', st_fullyspent:'W pełni wydane', st_overspent:'Przekroczone',
+    assign_capped:'Przypisano do wysokości dostępnych środków',
+    spend_target:'Przypisane',
+    income_target:'Cel przychodu', target_amount:'Cel (zł)', assigned_amount:'Przypisane (zł)', due_day:'Dzień terminu', frequency:'Częstotliwość',
     freq_monthly:'Co miesiąc', freq_yearly:'Co rok', freq_everyN:'Co N miesięcy', freq_once:'Jednorazowo',
     every_n_label:'Co (miesięcy)', apply_future:'Zastosuj do kolejnych miesięcy', no_due:'Brak terminu', clear_target:'Usuń cel'
   }
@@ -1167,7 +1171,9 @@ function normalizeContainers(node, level){
 function activity(catId, mKey){
   return state.transactions.filter(t=>t.categoryId===catId && txnMonth(t)===mKey).reduce((s,t)=>s+t.amount,0);
 }
-function assigned(catId, mKey){ return (state.assignments[mKey]||{})[catId]||0; }
+// The recurring plan (own share, resolved from spendPlan + per-month override) IS the assigned amount.
+// One number: shown in the Assigned column, carries forward with due date + frequency, and feeds Ready-to-Assign.
+function assigned(catId, mKey){ return spendTarget(catId, mKey); }
 
 /* ---------- INCOME PLANNING (per-month target + due date + recurrence) ----------
    Model: recurring effective-dated rules per category (state.incomePlan[catId]=[{from,amount,dueDay,freq,everyN}])
@@ -1224,22 +1230,21 @@ function spendTarget(catId, mKey){ const r=spendRule(catId,mKey); return r?r.amo
 function spendDueDay(catId, mKey){ const r=spendRule(catId,mKey); return r?r.dueDay:null; }
 function spendFreqLabel(catId, mKey){ return freqLabelOf(spendRule(catId,mKey)); }
 function spendPaymentStatus(catId, m){ return paymentStatusOf(spendRule(catId,m), m, activity(catId,m)<0); }  // spent something ⇒ paid
+// status = Assigned vs Spent (the Available value): overspent ⇒ underfunded, surplus ⇒ overfunded
 function spendBudgetStatus(node, m){
-  const avl=rolled(node,m,available);
-  if(avl<0) return 'overspent';
-  const tgt=rolled(node,m,spendTarget); if(!tgt) return null;
-  const asg=rolled(node,m,assigned), spent=-rolled(node,m,activity);
-  if(asg<tgt) return 'underfunded';
-  if(spent>0 && avl===0) return 'fullyspent';
-  return 'funded';
+  const asg=rolled(node,m,assigned), spent=-rolled(node,m,activity), avl=rolled(node,m,available);
+  if(asg===0 && spent===0) return null;     // untouched row — no badge
+  if(avl<0) return 'underfunded';           // spent more than assigned
+  if(spent===0) return 'funded';            // assigned, nothing spent yet
+  return avl>0 ? 'overfunded' : 'funded';   // spent less than / exactly what was assigned
 }
 
 // cumulative available through selected month (rolls forward, incl. negatives)
+// every month from the earliest budgeted month through mKey (contiguous, so recurring plans accumulate correctly)
 function monthsUpTo(mKey){
-  const keys=new Set();
-  Object.keys(state.assignments).forEach(k=>keys.add(k));
-  state.transactions.forEach(t=>keys.add(txnMonth(t)));
-  return [...keys].filter(k=>k<=mKey).sort();
+  let cur=earliestBudgetMonth(); if(mKey<cur) return [mKey];
+  const out=[]; for(let g=0; g<600 && cur<=mKey; g++){ out.push(cur); cur=nextMonthKey(cur); }
+  return out;
 }
 function available(catId, mKey){
   let sum=0;
@@ -1255,13 +1260,15 @@ function incomeActual(m){ const inc=incomeIdSet(); return state.transactions.fil
 function incomeExpectedTotal(m){ let s=0; eachNodeIn(incomeRoot(), n=>{ s+=expected(n.id,m); }); return s; }
 // income basis that becomes assignable: past = actual, current = max(expected,actual), future = expected
 function incomeBasis(m){ const cur=currentMonthKey(); if(m<cur) return incomeActual(m); if(m>cur) return incomeExpectedTotal(m); return Math.max(incomeExpectedTotal(m), incomeActual(m)); }
-function assignedTotalMonth(m){ const o=state.assignments[m]||{}; let s=0; for(const v of Object.values(o)) s+=v; return s; }
+function assignedTotalMonth(m){ let s=0; eachNodeIn(state.groups, n=>{ s+=assigned(n.id,m); }); return s; }   // Σ own-share plan amounts across expense nodes
 function earliestBudgetMonth(){
   let min=null; const upd=k=>{ if(k && (!min||k<min)) min=k; };
   state.transactions.forEach(t=>upd(txnMonth(t)));
   Object.keys(state.assignments||{}).forEach(upd);
   Object.keys(state.incomeOverride||{}).forEach(upd);
+  Object.keys(state.spendOverride||{}).forEach(upd);
   for(const arr of Object.values(state.incomePlan||{})) (arr||[]).forEach(r=>upd(r.from));
+  for(const arr of Object.values(state.spendPlan||{})) (arr||[]).forEach(r=>upd(r.from));
   return min || currentMonthKey();
 }
 // "Available to assign" at the end of month m = leftover carried in + income(m) − assigned(m); leftovers roll forward
@@ -1486,7 +1493,7 @@ function budgetView(){
     if(e.target.closest('[data-caret]')){ const id=e.target.closest('[data-caret]').dataset.caret; ui.collapsed[id]=!ui.collapsed[id]; render(); return; }
     ui.selCat=r.dataset.cat; render();
   });
-  wrap.querySelectorAll('[data-assign]').forEach(el=>el.onclick=e=>{e.stopPropagation();editAssign(el);});
+  wrap.querySelectorAll('[data-assign]').forEach(el=>el.onclick=e=>{e.stopPropagation();openSpendTarget(el.dataset.assign);});
   wrap.querySelectorAll('[data-billedit]').forEach(el=>el.onclick=e=>{e.stopPropagation();openSpendTarget(el.dataset.billedit);});
   wrap.querySelectorAll('[data-addcat]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAddCategory(b.dataset.addcat);});
   wrap.querySelectorAll('[data-addsub]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAddSub(b.dataset.addsub);});
@@ -1565,7 +1572,7 @@ function openPlanTarget(catId, kind){
     <div class="modal-b">
       <div class="tgt-txt" style="margin-bottom:10px">${escapeHtml(nodePathById(catId))} · ${keyToLabel(m)}</div>
       <div class="row2">
-        <div class="field"><label>${T('target_amount')}</label><input id="itAmt" type="text" placeholder="0,00" value="${shownAmt?grosz(shownAmt):''}"></div>
+        <div class="field"><label>${income?T('target_amount'):T('assigned_amount')}</label><input id="itAmt" type="text" placeholder="0,00" value="${shownAmt?grosz(shownAmt):''}"></div>
         <div class="field"><label>${T('due_day')}</label><input id="itDue" type="number" min="1" max="31" placeholder="—" value="${rule.dueDay||''}"></div>
       </div>
       <div class="row2">
@@ -1597,30 +1604,18 @@ function openPlanTarget(catId, kind){
   };
   $('#itSave').onclick=()=>{
     let v=parseAmt($('#itAmt').value); if(v<childSum) v=childSum;
-    const own=v-childSum;
+    let own=v-childSum;
+    // Spending: can't assign more than you have — cap the increase to the month's remaining Ready-to-Assign.
+    if(!income){
+      const curOwn=spendTarget(catId,m);
+      const cap=Math.max(curOwn, curOwn + readyToAssignMonth(m));   // current share + funds still unassigned this month
+      if(own>cap){ own=cap; toast(T('assign_capped')); }
+    }
     const dueDay=Math.max(0,Math.min(31, parseInt($('#itDue').value,10)||0))||null;
     const freqV=$('#itFreq').value, everyN=Math.max(2,Math.min(12, parseInt($('#itEvery').value,10)||3));
     write(own, dueDay, freqV, everyN, $('#itFuture').checked);
   };
   $('#itClear').onclick=()=>{ write(0, null, $('#itFreq').value, 3, $('#itFuture').checked); };
-}
-
-function editAssign(el){
-  const catId=el.dataset.assign, m=ui.month;
-  const node=catById(catId), kids=node?nodeKids(node):[];
-  const childSum = kids.filter(k=>!k.archived).reduce((s,k)=>s+rolled(k,m,assigned),0);   // total assigned beneath this node
-  const shown = childSum + assigned(catId,m);                      // what the row displays (rolled total)
-  const inp=document.createElement('input'); inp.type='text'; inp.value=(shown/100).toFixed(2).replace('.',',');
-  el.replaceWith(inp); inp.focus(); inp.select();
-  const commit=()=>{
-    let v=parseAmt(inp.value);
-    if(v<childSum) v=childSum;                     // a parent can't be set below the sum of its children
-    if(!state.assignments[m]) state.assignments[m]={};
-    state.assignments[m][catId] = v - childSum;    // store this node's OWN share; the rest comes from children
-    render();
-  };
-  inp.onkeydown=e=>{if(e.key==='Enter')commit(); if(e.key==='Escape')render();};
-  inp.onblur=commit;
 }
 
 /* ---------- INSPECTOR ---------- */
@@ -2746,7 +2741,7 @@ document.getElementById('prevM').onclick=()=>shiftMonth(-1);
 document.getElementById('nextM').onclick=()=>shiftMonth(1);
 document.getElementById('todayM').onclick=()=>{ ui.month=currentMonthKey(); ui.selCat=null; render(); };
 document.getElementById('addTxnBtn').onclick=openAddTxn;
-document.getElementById('rtaPill').onclick=autoAssignTargets;
+document.getElementById('rtaPill').onclick=openRtaBreakdown;
 // mobile drawer (hamburger) + backdrop
 const sidebarEl=document.querySelector('.sidebar'), backdropEl=document.getElementById('sideBackdrop');
 function openSidebar(){ sidebarEl.classList.add('open'); backdropEl.classList.add('show'); }
