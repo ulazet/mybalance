@@ -428,6 +428,18 @@
   .card .v{font-size:1.7rem;font-weight:800;font-variant-numeric:tabular-nums;margin-top:6px;letter-spacing:-.01em;}
   .card .v.green{color:var(--green);} .card .v.red{color:var(--red);}
   .card .sub{font-size:.78rem;color:var(--ink-soft);margin-top:3px;}
+  /* dashboard 2x2 summary grid */
+  .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .dash-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 18px;box-shadow:var(--sh-1);}
+  .dash-box h3{margin:0 0 6px;font-size:.95rem;font-weight:800;letter-spacing:-.01em;}
+  .dash-row{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:8px 0;border-top:1px solid var(--line);}
+  .dash-row .lbl{color:var(--ink-soft);font-size:.83rem;line-height:1.3;}
+  .dash-row .amt{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .dash-row.status .lbl{color:var(--ink);font-weight:600;}
+  .dash-row .amt.green{color:var(--green);} .dash-row .amt.red{color:var(--red);}
+  .dash-box.later{opacity:.55;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:130px;color:var(--ink-soft);text-align:center;gap:4px;}
+  .dash-box.later .later-t{font-weight:700;color:var(--ink);}
+  @media(max-width:768px){ .dash-grid{grid-template-columns:1fr;} }
   .rep-panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:20px;box-shadow:var(--sh-1);margin-bottom:20px;}
   .rep-panel h3{margin:0 0 16px;font-size:1rem;}
   .spend-row{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
@@ -703,6 +715,15 @@ const I18N = {
     new_category:'New category', category_name:'Category name', category_ph:'e.g. Subscriptions',
     new_group:'New category group', group_name:'Group name', group_ph:'e.g. Kids',
     dash_income:'Income', dash_expenses:'Expenses', dash_month_balance:'Month balance', dash_net_worth:'Net worth',
+    dash_sum_title:mon=>`${mon} summary`, dash_funds_title:mon=>`${mon} funds`,
+    dash_cost_title:'Cost to be me', dash_overdraft_title:'Overdraft balances', dash_soon:'Coming soon',
+    dash_leftover:mon=>`Ready to Assign — leftover from ${mon}`, dash_inflow:mon=>`Ready to Assign — inflow in ${mon}`,
+    dash_inc_more:'Your income is more than expected', dash_inc_as:'Your income is as expected', dash_inc_less:'Your income is less than expected',
+    dash_assigned:mon=>`Assigned in ${mon}`,
+    dash_asg_left:'Ready to assign', dash_asg_all:'All assigned', dash_asg_over:'You assigned more than you have',
+    dash_activity:mon=>`Activity — outflow in ${mon}`,
+    dash_spent_less_asg:'You spent less than assigned', dash_spent_as_asg:'You spent as much as assigned', dash_spent_more_asg:'You spent more than assigned',
+    dash_spent_less_inc:'You spent less than your income', dash_spent_as_inc:'You spent as much as your income', dash_spent_more_inc:'You spent more than your income',
     spending_by_cat:'Spending by category', no_expenses:'No expenses this month.', account_balances:'Account balances',
     transfer_to:n=>`Transfer to ${n}`, transfer_from:n=>`Transfer from ${n}`, pocket_topup:'Top up pocket', pocket_withdraw:'Withdraw from pocket',
     to_pocket:n=>`To: ${n}`, from_pocket:n=>`From: ${n}`, transfer_out_pocket:'Transfer from pocket', transfer_in_pocket:'Transfer to pocket',
@@ -785,6 +806,15 @@ const I18N = {
     new_category:'Nowa kategoria', category_name:'Nazwa kategorii', category_ph:'np. Subskrypcje',
     new_group:'Nowa grupa kategorii', group_name:'Nazwa grupy', group_ph:'np. Dzieci',
     dash_income:'Przychód', dash_expenses:'Wydatki', dash_month_balance:'Bilans miesiąca', dash_net_worth:'Wartość netto',
+    dash_sum_title:mon=>`Podsumowanie: ${mon}`, dash_funds_title:mon=>`Środki: ${mon}`,
+    dash_cost_title:'Koszt bycia sobą', dash_overdraft_title:'Salda debetowe', dash_soon:'Wkrótce',
+    dash_leftover:mon=>`Do rozdysponowania — pozostało z ${mon}`, dash_inflow:mon=>`Do rozdysponowania — wpływy w ${mon}`,
+    dash_inc_more:'Twój przychód jest wyższy niż zakładany', dash_inc_as:'Twój przychód jest zgodny z planem', dash_inc_less:'Twój przychód jest niższy niż zakładany',
+    dash_assigned:mon=>`Rozdysponowano w ${mon}`,
+    dash_asg_left:'Do rozdysponowania', dash_asg_all:'Wszystko rozdysponowane', dash_asg_over:'Rozdysponowano więcej niż masz',
+    dash_activity:mon=>`Aktywność — wydatki w ${mon}`,
+    dash_spent_less_asg:'Wydałeś mniej niż przypisano', dash_spent_as_asg:'Wydałeś tyle ile przypisano', dash_spent_more_asg:'Wydałeś więcej niż przypisano',
+    dash_spent_less_inc:'Wydałeś mniej niż wyniósł przychód', dash_spent_as_inc:'Wydałeś tyle ile wyniósł przychód', dash_spent_more_inc:'Wydałeś więcej niż wyniósł przychód',
     spending_by_cat:'Wydatki wg kategorii', no_expenses:'Brak wydatków w tym miesiącu.', account_balances:'Salda kont',
     transfer_to:n=>`Przelew do ${n}`, transfer_from:n=>`Przelew z ${n}`, pocket_topup:'Zasilenie podkonta', pocket_withdraw:'Wypłata z podkonta',
     to_pocket:n=>`Do: ${n}`, from_pocket:n=>`Z: ${n}`, transfer_out_pocket:'Przelew z podkonta', transfer_in_pocket:'Przelew na podkonto',
@@ -1254,6 +1284,7 @@ function available(catId, mKey){
 /* ---- PER-MONTH budgeting: each month's "Available to assign" = carry-in + income − assigned ---- */
 const currentMonthKey = () => todayISO().slice(0,7);
 function nextMonthKey(m){ const [y,mo]=m.split('-').map(Number); const d=new Date(y,mo,1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+function prevMonthKey(m){ const [y,mo]=m.split('-').map(Number); const d=new Date(y,mo-2,1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
 // actual income received in a month (RTA-keyed inflows + income-node transactions, incl. starting balances)
 function incomeActual(m){ const inc=incomeIdSet(); return state.transactions.filter(t=>txnMonth(t)===m && (t.categoryId===RTA()||inc.has(t.categoryId))).reduce((s,t)=>s+t.amount,0); }
 // planned income for a month = Σ of every income node's target
@@ -1314,22 +1345,6 @@ function openRtaBreakdown(){
 }
 
 /* target progress: returns {needed, funded, pct, state:'funded'|'under'|'none'} */
-function targetInfo(cat, mKey){
-  if(!cat.target) return {state:'none'};
-  const t=cat.target;
-  if(t.type==='monthly'){
-    const funded=assigned(cat.id,mKey);
-    const pct=t.amount?Math.min(100,Math.round(funded/t.amount*100)):100;
-    return {needed:t.amount,funded,pct,state:funded>=t.amount?'funded':'under'};
-  }
-  if(t.type==='balance'){
-    const funded=available(cat.id,mKey);
-    const pct=t.amount?Math.min(100,Math.round(funded/t.amount*100)):100;
-    return {needed:t.amount,funded,pct,state:funded>=t.amount?'funded':'under'};
-  }
-  return {state:'none'};
-}
-
 /* ---------- NAV / CHROME / LANGUAGE ---------- */
 const ICON={
   dashboard:`<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>`,
@@ -1604,13 +1619,7 @@ function openPlanTarget(catId, kind){
   };
   $('#itSave').onclick=()=>{
     let v=parseAmt($('#itAmt').value); if(v<childSum) v=childSum;
-    let own=v-childSum;
-    // Spending: can't assign more than you have — cap the increase to the month's remaining Ready-to-Assign.
-    if(!income){
-      const curOwn=spendTarget(catId,m);
-      const cap=Math.max(curOwn, curOwn + readyToAssignMonth(m));   // current share + funds still unassigned this month
-      if(own>cap){ own=cap; toast(T('assign_capped')); }
-    }
+    const own=v-childSum;   // free assigning — over-assigning just drives Ready-to-Assign negative (strict mode TBD)
     const dueDay=Math.max(0,Math.min(31, parseInt($('#itDue').value,10)||0))||null;
     const freqV=$('#itFreq').value, everyN=Math.max(2,Math.min(12, parseInt($('#itEvery').value,10)||3));
     write(own, dueDay, freqV, everyN, $('#itFuture').checked);
@@ -1627,7 +1636,7 @@ function inspectorView(){
   }
   const c=catById(ui.selCat); if(!c){ui.selCat=null;return inspectorView();}
   el.classList.add('sheet-open');
-  const avl=rolled(c,ui.month,available), ti=targetInfo(c,ui.month);
+  const avl=rolled(c,ui.month,available);
   const cls=avl<0?'red':avl>0?'green':'';
   const locked=isPastMonth(ui.month);   // no moving money in past months
   const otherCats=allCats().filter(x=>x.id!==c.id);
@@ -1636,20 +1645,6 @@ function inspectorView(){
     <div class="insp-title">${c.name}</div>
     <div class="insp-sub">${keyToLabel(ui.month)}</div>
     <div class="insp-avail"><div class="v" style="color:${avl<0?'var(--red)':avl>0?'var(--green)':'var(--ink)'}">${fmt(avl)}</div><div class="l">${T('available')}</div></div>
-
-    <div class="insp-sec">
-      <h4>${T('target')}</h4>
-      <div class="field"><label>${T('target_type')}</label>
-        <select id="tgtType">
-          <option value="none" ${!c.target?'selected':''}>${T('target_none')}</option>
-          <option value="monthly" ${c.target&&c.target.type==='monthly'?'selected':''}>${T('target_monthly')}</option>
-          <option value="balance" ${c.target&&c.target.type==='balance'?'selected':''}>${T('target_balance')}</option>
-        </select></div>
-      <div class="field" id="tgtAmtField" style="${c.target?'':'display:none'}"><label>${T('amount_zl')}</label>
-        <input id="tgtAmt" type="text" value="${c.target?(c.target.amount/100).toFixed(2).replace('.',','):''}" placeholder="500"></div>
-      <button class="mini-btn" id="saveTgt">${T('save_target')}</button>
-      ${ti.state!=='none'?`<div class="tgt-txt" style="margin-top:8px">${ti.state==='funded'?T('target_met'):T('target_short',fmt(ti.needed-ti.funded))}</div>`:''}
-    </div>
 
     ${locked ? `<div class="insp-sec"><h4>${T('move_money')}</h4><div class="tgt-txt">${T('rta_past_locked')}</div></div>` : `<div class="insp-sec">
       <h4>${T('move_money')}</h4>
@@ -1665,13 +1660,6 @@ function inspectorView(){
     <a class="link-btn" id="delCat">${T('delete_category')}</a>`;
 
   const scBtn=el.querySelector('[data-sheetclose]'); if(scBtn) scBtn.onclick=()=>{ui.selCat=null;render();};
-  el.querySelector('#tgtType').onchange=e=>{el.querySelector('#tgtAmtField').style.display=e.target.value==='none'?'none':'block';};
-  el.querySelector('#saveTgt').onclick=()=>{
-    const type=el.querySelector('#tgtType').value;
-    if(type==='none') c.target=null;
-    else c.target={type,amount:parseAmt(el.querySelector('#tgtAmt').value)};
-    toast(T('target_saved')); render();
-  };
   const mvBtn=el.querySelector('#doMove');
   if(mvBtn) mvBtn.onclick=()=>{
     if(isPastMonth(ui.month)) return;
@@ -1947,16 +1935,52 @@ function monthStats(m){
   const spend = Object.values(spendByCat).reduce((s,v)=>s+v,0);   // negative
   return {income, spend, spendByCat};
 }
+// account balance counting only transactions dated up to and including month mKey
+function acctBalanceUpTo(id, mKey){ return state.transactions.filter(t=>t.accountId===id && t.type!=='pocket' && txnMonth(t)<=mKey).reduce((s,t)=>s+t.amount,0); }
+// all spendable money = cash balances + available credit limits (overdraft/card headroom), shown as positive
+function availableFundsNow(){ return state.accounts.reduce((s,a)=>s+availableFunds(a),0); }
+function availableFundsAsOf(mKey){ return state.accounts.reduce((s,a)=>{ const bal=acctBalanceUpTo(a.id,mKey); return s + (showLimit(a.type)? bal+(a.creditLimit||0) : bal); },0); }
+const monShort = m => keyToLabel(m).split(' ')[0];
+
 function dashboardView(){
   const el=document.createElement('div'); el.style.maxWidth='980px'; el.style.margin='0 auto';
-  const m=ui.month; const {income,spend}=monthStats(m);
-  el.innerHTML=`
-    <div class="cards">
-      <div class="card"><div class="l">${T('dash_income')} (${keyToLabel(m).split(' ')[0]})</div><div class="v green">${fmt(income)}</div></div>
-      <div class="card"><div class="l">${T('dash_expenses')}</div><div class="v red">${fmt(spend)}</div></div>
-      <div class="card"><div class="l">${T('dash_month_balance')}</div><div class="v ${income+spend>=0?'green':'red'}">${fmt(income+spend)}</div></div>
-      <div class="card"><div class="l">${T('dash_net_worth')}</div><div class="v">${fmt(netWorth())}</div></div>
-    </div>`;
+  const m=ui.month, lm=prevMonthKey(m);
+  const {income, spend} = monthStats(m);          // income = real inflow (excl. opening balances); spend = outflow (negative)
+  const spent = -spend;                            // positive amount spent
+  const leftover  = availableFundsAsOf(lm);        // funds carried into this month (cash + available credit), positive
+  const planned   = incomeExpectedTotal(m);        // planned inflow for this month
+  const inflowDiff= income - planned;              // >0 more than expected, <0 less
+  const asg       = assignedTotalMonth(m);         // assigned this month
+  const rtaSum    = leftover + income;             // total ready to assign = leftover + real inflow
+  const asgLeft   = rtaSum - asg;                  // >0 still to assign, <0 assigned more than you have
+  const availNow  = availableFundsNow();           // all spendable funds right now, positive
+
+  const row = (lbl, val, cls='', status=false) =>
+    `<div class="dash-row ${status?'status':''}"><span class="lbl">${lbl}</span><span class="amt ${cls}">${fmt(val)}</span></div>`;
+
+  // ---- This Month's summary ----
+  const inflowStatus = income>planned ? [T('dash_inc_more'),'green'] : income<planned ? [T('dash_inc_less'),'red'] : [T('dash_inc_as'),''];
+  const asgStatus    = asgLeft>0 ? [T('dash_asg_left'),''] : asgLeft<0 ? [T('dash_asg_over'),'red'] : [T('dash_asg_all'),'green'];
+  const summary = `<div class="dash-box"><h3>${T('dash_sum_title', monShort(m))}</h3>
+    ${row(T('dash_leftover', monShort(lm)), leftover)}
+    ${row(T('dash_inflow', monShort(m)), income)}
+    ${row(inflowStatus[0], inflowDiff, inflowStatus[1], true)}
+    ${row(T('dash_assigned', monShort(m)), asg)}
+    ${row(asgStatus[0], asgLeft, asgStatus[1], true)}</div>`;
+
+  // ---- This Month's Funds ----
+  const spendVsAsg = spent<asg ? [T('dash_spent_less_asg'),'green'] : spent>asg ? [T('dash_spent_more_asg'),'red'] : [T('dash_spent_as_asg'),''];
+  const spendVsInc = spent<income ? [T('dash_spent_less_inc'),'green'] : spent>income ? [T('dash_spent_more_inc'),'red'] : [T('dash_spent_as_inc'),''];
+  const funds = `<div class="dash-box"><h3>${T('dash_funds_title', monShort(m))}</h3>
+    ${row(T('dash_activity', monShort(m)), spend)}
+    ${row(spendVsAsg[0], spend, spendVsAsg[1], true)}
+    ${row(spendVsInc[0], income+spend, spendVsInc[1], true)}
+    ${row(T('available_funds'), availNow)}</div>`;
+
+  // ---- placeholders (built later) ----
+  const later = t => `<div class="dash-box later"><span class="later-t">${t}</span><span>${T('dash_soon')}</span></div>`;
+
+  el.innerHTML = `<div class="dash-grid">${summary}${later(T('dash_cost_title'))}${funds}${later(T('dash_overdraft_title'))}</div>`;
   return el;
 }
 function kontaView(){
@@ -2748,20 +2772,6 @@ function openSidebar(){ sidebarEl.classList.add('open'); backdropEl.classList.ad
 function closeSidebar(){ sidebarEl.classList.remove('open'); backdropEl.classList.remove('show'); }
 document.getElementById('menuBtn').onclick=openSidebar;
 backdropEl.onclick=closeSidebar;
-
-// Click RTA -> auto-fund all monthly targets to their needed amount (up to available)
-function autoAssignTargets(){
-  if(!state.assignments[ui.month]) state.assignments[ui.month]={};
-  const m=state.assignments[ui.month]; let funded=0;
-  for(const c of allCats()){
-    if(c.target && c.target.type==='monthly'){
-      const cur=assigned(c.id,ui.month);
-      if(cur<c.target.amount){ const rta=readyToAssign(); if(rta<=0)break;
-        const need=Math.min(c.target.amount-cur, rta); m[c.id]=cur+need; funded+=need; }
-    }
-  }
-  render(); toast(funded?T('assigned_to_targets',fmt(funded)):T('all_targets_funded'));
-}
 
 /* =========================================================================
    CLOUD SYNC + LOGIN (Supabase)
