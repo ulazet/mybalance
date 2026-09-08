@@ -437,6 +437,11 @@
   .dash-row .amt{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;}
   .dash-row.status .lbl{color:var(--ink);font-weight:600;}
   .dash-row .amt.green{color:var(--green);} .dash-row .amt.red{color:var(--red);}
+  .db-badge{display:inline-block;padding:3px 10px;border-radius:var(--r-pill);font-size:.73rem;font-weight:700;line-height:1.35;}
+  .db-badge.good{background:var(--green-bg);color:var(--green);}
+  .db-badge.bad{background:var(--red-bg);color:var(--red);}
+  .db-badge.neu{background:var(--grey-bg);color:var(--grey-fg);}
+  .db-badge.info{background:#e9eefb;color:#3455b5;}
   .dash-box.later{opacity:.55;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:130px;color:var(--ink-soft);text-align:center;gap:4px;}
   .dash-box.later .later-t{font-weight:700;color:var(--ink);}
   @media(max-width:768px){ .dash-grid{grid-template-columns:1fr;} }
@@ -717,7 +722,8 @@ const I18N = {
     dash_income:'Income', dash_expenses:'Expenses', dash_month_balance:'Month balance', dash_net_worth:'Net worth',
     dash_sum_title:mon=>`${mon} summary`, dash_funds_title:mon=>`${mon} funds`,
     dash_cost_title:'Cost to be me', dash_overdraft_title:'Overdraft balances', dash_soon:'Coming soon',
-    dash_leftover:mon=>`Ready to Assign — leftover from ${mon}`, dash_inflow:mon=>`Ready to Assign — inflow in ${mon}`,
+    dash_leftover:mon=>`Leftover from ${mon}`, dash_inflow:mon=>`Inflow in ${mon}`,
+    dash_avail_credit:'Available credit limits', dash_expected_income:'Expected income',
     dash_inc_more:'Your income is more than expected', dash_inc_as:'Your income is as expected', dash_inc_less:'Your income is less than expected',
     dash_assigned:mon=>`Assigned in ${mon}`,
     dash_asg_left:'Ready to assign', dash_asg_all:'All assigned', dash_asg_over:'You assigned more than you have',
@@ -808,7 +814,8 @@ const I18N = {
     dash_income:'Przychód', dash_expenses:'Wydatki', dash_month_balance:'Bilans miesiąca', dash_net_worth:'Wartość netto',
     dash_sum_title:mon=>`Podsumowanie: ${mon}`, dash_funds_title:mon=>`Środki: ${mon}`,
     dash_cost_title:'Koszt bycia sobą', dash_overdraft_title:'Salda debetowe', dash_soon:'Wkrótce',
-    dash_leftover:mon=>`Do rozdysponowania — pozostało z ${mon}`, dash_inflow:mon=>`Do rozdysponowania — wpływy w ${mon}`,
+    dash_leftover:mon=>`Pozostało z ${mon}`, dash_inflow:mon=>`Wpływy w ${mon}`,
+    dash_avail_credit:'Dostępne limity kredytowe', dash_expected_income:'Zakładany przychód',
     dash_inc_more:'Twój przychód jest wyższy niż zakładany', dash_inc_as:'Twój przychód jest zgodny z planem', dash_inc_less:'Twój przychód jest niższy niż zakładany',
     dash_assigned:mon=>`Rozdysponowano w ${mon}`,
     dash_asg_left:'Do rozdysponowania', dash_asg_all:'Wszystko rozdysponowane', dash_asg_over:'Rozdysponowano więcej niż masz',
@@ -1937,9 +1944,10 @@ function monthStats(m){
 }
 // account balance counting only transactions dated up to and including month mKey
 function acctBalanceUpTo(id, mKey){ return state.transactions.filter(t=>t.accountId===id && t.type!=='pocket' && txnMonth(t)<=mKey).reduce((s,t)=>s+t.amount,0); }
-// all spendable money = cash balances + available credit limits (overdraft/card headroom), shown as positive
-function availableFundsNow(){ return state.accounts.reduce((s,a)=>s+availableFunds(a),0); }
+// all spendable money at end of month mKey = cash balances + available credit headroom, shown as positive
 function availableFundsAsOf(mKey){ return state.accounts.reduce((s,a)=>{ const bal=acctBalanceUpTo(a.id,mKey); return s + (showLimit(a.type)? bal+(a.creditLimit||0) : bal); },0); }
+// unused credit headroom (cards + overdraft limits) at end of month mKey
+function availableCreditAsOf(mKey){ return state.accounts.filter(a=>showLimit(a.type)).reduce((s,a)=>s + (a.creditLimit||0) + Math.min(0, acctBalanceUpTo(a.id,mKey)), 0); }
 const monShort = m => keyToLabel(m).split(' ')[0];
 
 function dashboardView(){
@@ -1948,39 +1956,47 @@ function dashboardView(){
   const {income, spend} = monthStats(m);          // income = real inflow (excl. opening balances); spend = outflow (negative)
   const spent = -spend;                            // positive amount spent
   const leftover  = availableFundsAsOf(lm);        // funds carried into this month (cash + available credit), positive
-  const planned   = incomeExpectedTotal(m);        // planned inflow for this month
+  const planned   = incomeExpectedTotal(m);        // planned/expected inflow for this month
   const inflowDiff= income - planned;              // >0 more than expected, <0 less
   const asg       = assignedTotalMonth(m);         // assigned this month
   const rtaSum    = leftover + income;             // total ready to assign = leftover + real inflow
   const asgLeft   = rtaSum - asg;                  // >0 still to assign, <0 assigned more than you have
-  const availNow  = availableFundsNow();           // all spendable funds right now, positive
+  const availCredit = availableCreditAsOf(m);      // available credit limits
+  const availFunds  = availableFundsAsOf(m);       // available funds for the viewed month (past = that month's leftover)
 
-  const row = (lbl, val, cls='', status=false) =>
-    `<div class="dash-row ${status?'status':''}"><span class="lbl">${lbl}</span><span class="amt ${cls}">${fmt(val)}</span></div>`;
+  // plain informational row (value red when negative)
+  const row = (lbl, val) => `<div class="dash-row"><span class="lbl">${lbl}</span><span class="amt ${val<0?'red':''}">${fmt(val)}</span></div>`;
+  // status row: label rendered as a soft-color badge (good/bad/neu/info)
+  const stat = (badge, lbl, val) => `<div class="dash-row status"><span class="db-badge ${badge}">${lbl}</span><span class="amt ${val<0?'red':''}">${fmt(val)}</span></div>`;
 
-  // ---- This Month's summary ----
-  const inflowStatus = income>planned ? [T('dash_inc_more'),'green'] : income<planned ? [T('dash_inc_less'),'red'] : [T('dash_inc_as'),''];
-  const asgStatus    = asgLeft>0 ? [T('dash_asg_left'),''] : asgLeft<0 ? [T('dash_asg_over'),'red'] : [T('dash_asg_all'),'green'];
+  // ---- This month's summary ----
+  const inflowStatus = income>planned ? ['good',T('dash_inc_more')] : income<planned ? ['bad',T('dash_inc_less')] : ['neu',T('dash_inc_as')];
+  const asgStatus    = asgLeft>0 ? ['info',T('dash_asg_left')] : asgLeft<0 ? ['bad',T('dash_asg_over')] : ['good',T('dash_asg_all')];
   const summary = `<div class="dash-box"><h3>${T('dash_sum_title', monShort(m))}</h3>
     ${row(T('dash_leftover', monShort(lm)), leftover)}
     ${row(T('dash_inflow', monShort(m)), income)}
-    ${row(inflowStatus[0], inflowDiff, inflowStatus[1], true)}
-    ${row(T('dash_assigned', monShort(m)), asg)}
-    ${row(asgStatus[0], asgLeft, asgStatus[1], true)}</div>`;
+    ${row(T('dash_avail_credit'), availCredit)}
+    ${stat(inflowStatus[0], inflowStatus[1], inflowDiff)}
+    ${stat(asgStatus[0], asgStatus[1], asgLeft)}</div>`;
 
-  // ---- This Month's Funds ----
-  const spendVsAsg = spent<asg ? [T('dash_spent_less_asg'),'green'] : spent>asg ? [T('dash_spent_more_asg'),'red'] : [T('dash_spent_as_asg'),''];
-  const spendVsInc = spent<income ? [T('dash_spent_less_inc'),'green'] : spent>income ? [T('dash_spent_more_inc'),'red'] : [T('dash_spent_as_inc'),''];
+  // ---- Cost to be me (partial — more later) ----
+  const cost = `<div class="dash-box"><h3>${T('dash_cost_title')}</h3>
+    ${row(T('dash_expected_income'), planned)}
+    ${row(T('dash_assigned', monShort(m)), asg)}</div>`;
+
+  // ---- This month's funds ----
+  const spendVsAsg = spent<asg ? ['good',T('dash_spent_less_asg')] : spent>asg ? ['bad',T('dash_spent_more_asg')] : ['neu',T('dash_spent_as_asg')];
+  const spendVsInc = spent<income ? ['good',T('dash_spent_less_inc')] : spent>income ? ['bad',T('dash_spent_more_inc')] : ['neu',T('dash_spent_as_inc')];
   const funds = `<div class="dash-box"><h3>${T('dash_funds_title', monShort(m))}</h3>
     ${row(T('dash_activity', monShort(m)), spend)}
-    ${row(spendVsAsg[0], spend, spendVsAsg[1], true)}
-    ${row(spendVsInc[0], income+spend, spendVsInc[1], true)}
-    ${row(T('available_funds'), availNow)}</div>`;
+    ${stat(spendVsAsg[0], spendVsAsg[1], spend)}
+    ${stat(spendVsInc[0], spendVsInc[1], income+spend)}
+    ${row(T('available_funds'), availFunds)}</div>`;
 
-  // ---- placeholders (built later) ----
+  // ---- placeholder (built later) ----
   const later = t => `<div class="dash-box later"><span class="later-t">${t}</span><span>${T('dash_soon')}</span></div>`;
 
-  el.innerHTML = `<div class="dash-grid">${summary}${later(T('dash_cost_title'))}${funds}${later(T('dash_overdraft_title'))}</div>`;
+  el.innerHTML = `<div class="dash-grid">${summary}${cost}${funds}${later(T('dash_overdraft_title'))}</div>`;
   return el;
 }
 function kontaView(){
