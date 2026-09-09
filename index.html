@@ -991,7 +991,7 @@ function seed(){
 
 /* ---------- PERSISTENCE ---------- */
 function normalize(s){
-  (s.accounts||[]).forEach(a=>{ if(a.number==null)a.number=''; if(a.creditLimit==null)a.creditLimit=0; delete a.availableOverride; if(!Array.isArray(a.pockets))a.pockets=[]; });
+  (s.accounts||[]).forEach(a=>{ if(a.number==null)a.number=''; if(a.creditLimit==null)a.creditLimit=0; if(a.onBudget==null)a.onBudget=(a.type!=='tracking'); delete a.availableOverride; if(!Array.isArray(a.pockets))a.pockets=[]; });
   if(!s.payees){                                   // one-time: derive payee memory from existing categorized transactions
     s.payees={};
     (s.transactions||[]).forEach(t=>{ if(t.type||t.starting||!t.categoryId||!t.payee) return;
@@ -1946,12 +1946,13 @@ function monthStats(m){
 }
 // account balance counting only transactions dated up to and including month mKey
 function acctBalanceUpTo(id, mKey){ return state.transactions.filter(t=>t.accountId===id && t.type!=='pocket' && txnMonth(t)<=mKey).reduce((s,t)=>s+t.amount,0); }
-// all spendable money at end of month mKey = cash balances + available credit headroom, shown as positive
-function availableFundsAsOf(mKey){ return state.accounts.reduce((s,a)=>{ const bal=acctBalanceUpTo(a.id,mKey); return s + (showLimit(a.type)? bal+(a.creditLimit||0) : bal); },0); }
-// unused credit headroom (cards + overdraft limits) at end of month mKey
-function availableCreditAsOf(mKey){ return state.accounts.filter(a=>showLimit(a.type)).reduce((s,a)=>s + (a.creditLimit||0) + Math.min(0, acctBalanceUpTo(a.id,mKey)), 0); }
-// real cash balances only (no credit limits) at end of month mKey
-function cashAsOf(mKey){ return state.accounts.reduce((s,a)=>s+acctBalanceUpTo(a.id,mKey),0); }
+// Budgeting funds ignore off-budget (tracking) accounts entirely.
+// Real cash on hand = on-budget deposit accounts (NOT credit cards); a negative balance counts as 0.
+function cashAsOf(mKey){ return state.accounts.filter(a=>a.onBudget && a.type!=='credit').reduce((s,a)=>s + Math.max(0, acctBalanceUpTo(a.id,mKey)), 0); }
+// Available credit = unused headroom of any on-budget account that has a credit limit (cards + checking overdraft), minus what's already used.
+function availableCreditAsOf(mKey){ return state.accounts.filter(a=>a.onBudget && (a.creditLimit||0)>0).reduce((s,a)=>s + a.creditLimit + Math.min(0, acctBalanceUpTo(a.id,mKey)), 0); }
+// Total spendable at end of month = cash on hand + available credit.
+function availableFundsAsOf(mKey){ return cashAsOf(mKey) + availableCreditAsOf(mKey); }
 const monShort = m => keyToLabel(m).split(' ')[0];
 
 function dashboardView(){
@@ -1959,7 +1960,7 @@ function dashboardView(){
   const m=ui.month, lm=prevMonthKey(m);
   const {income, spend} = monthStats(m);          // income = real inflow (excl. opening balances); spend = outflow (negative)
   const spent = -spend;                            // positive amount spent
-  const leftoverCash = Math.max(0, cashAsOf(lm));  // real cash carried in from last month (floored at 0 — overdraft shows 0)
+  const leftoverCash = cashAsOf(lm);               // real cash carried in from last month (per-account floored at 0)
   const planned   = incomeExpectedTotal(m);        // planned/expected inflow for this month
   const inflowDiff= income - planned;              // >0 more than expected, <0 less
   const asg       = assignedTotalMonth(m);         // assigned this month
