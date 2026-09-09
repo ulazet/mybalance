@@ -1965,8 +1965,7 @@ function dashboardView(){
   const inflowDiff= income - planned;              // >0 more than expected, <0 less
   const asg       = assignedTotalMonth(m);         // assigned this month
   const cashBalance = leftoverCash + income;       // cash carried in + this month's real inflow
-  const availCredit = availableCreditAsOf(m);      // available credit limits (unused headroom)
-  const totalAvail  = cashBalance + availCredit;   // total available funds = cash balance + available credit
+  const availCredit = availableCreditAsOf(m);      // available credit limits (unused headroom) — shown in Bills
   const asgLeft   = cashBalance - asg;             // >0 still to assign, <0 assigned more than you have
   const availFunds  = availableFundsAsOf(m);       // available funds for the viewed month (past = that month's leftover)
 
@@ -1979,9 +1978,7 @@ function dashboardView(){
   const funds = `<div class="dash-box"><h3>${T('dash_sum_title', monShort(m))}</h3>
     ${row(T('dash_leftover', monShort(lm)), leftoverCash)}
     ${row(T('dash_inflow', monShort(m)), income)}
-    ${row(T('dash_cash_balance'), cashBalance)}
-    ${row(T('dash_avail_credit'), availCredit)}
-    ${row(T('dash_total_avail'), totalAvail)}</div>`;
+    ${row(T('dash_cash_balance'), cashBalance)}</div>`;
 
   // ---- Cost to be me (partial — more later) ----
   const inflowStatus = income>planned ? ['good',T('dash_inc_more')] : income<planned ? ['bad',T('dash_inc_less')] : ['neu',T('dash_inc_as')];
@@ -1999,6 +1996,7 @@ function dashboardView(){
     ${row(T('dash_activity', monShort(m)), spend)}
     ${stat(spendVsAsg[0], spendVsAsg[1], spend)}
     ${stat(spendVsInc[0], spendVsInc[1], income+spend)}
+    ${row(T('dash_avail_credit'), availCredit)}
     ${row(T('available_funds'), availFunds)}</div>`;
 
   // ---- placeholder (built later) ----
