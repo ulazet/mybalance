@@ -577,6 +577,9 @@
   .sidebar.collapsed .nav button span{display:none;}
   .sidebar.collapsed .accts,.sidebar.collapsed .side-foot{display:none;}
   /* ===== language toggle ===== */
+  .sf-settings{display:flex;flex-direction:column;gap:7px;margin-bottom:12px;}
+  .sf-set-row{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;
+    font-size:.75rem;font-weight:600;color:var(--ink-inv-soft);}
   .lang-tog{display:flex;gap:4px;margin-bottom:10px;}
   .lang-tog button{flex:1;padding:6px;border-radius:var(--r-sm);font-size:.72rem;font-weight:700;
     color:var(--ink-inv-soft);background:rgba(255,255,255,.06);transition:.1s;}
@@ -676,11 +679,12 @@ const I18N = {
     today_btn:'Today', rta_carry_in:'Left over from previous month', rta_income:'Income this month', rta_assigned_month:'Assigned this month', rta_available:'Available to assign',
     rta_income_actual:'actual', rta_income_expected:'expected', rta_income_maxeh:'expected or actual',
     rta_past_locked:'Past month — assigning is locked (view only).',
-    rta_explain:'Available to assign = the previous month’s leftover + this month’s income − what you assigned this month. Leftovers roll into next month; future months use your expected income so you can plan ahead.',
+    rta_explain:'Ready to assign = leftover cash + income + available credit − assigned. “Plan ahead” lets income use your planned amount; “Use available limits” adds your credit headroom. You can’t assign past this total.',
     add_txn:'Transaction',
     nav_dashboard:'Dashboard', nav_budget:'Budget', nav_transactions:'Transactions', nav_accounts:'Accounts', nav_reports:'Reports', nav_more:'More',
     on_budget:'On-budget', tracking:'Tracking', add_account:'+ Add account', net_worth:'Net worth',
     export:'Export', import:'Import', logout:'Log out', language:'Language',
+    set_plan_ahead:'Plan ahead', set_use_limits:'Use available limits',
     auth_intro:'Sign in with your email to sync your budget across all your devices.', auth_email_ph:'you@email.com',
     auth_send:'Send login link', auth_enter_email:'Enter your email.', auth_sending:'Sending link…',
     auth_sent:e=>`✓ Check your inbox — a login link was sent to ${e}.`, auth_error:m=>`Error: ${m}`,
@@ -769,11 +773,12 @@ const I18N = {
     today_btn:'Dziś', rta_carry_in:'Pozostało z poprzedniego miesiąca', rta_income:'Przychód w tym miesiącu', rta_assigned_month:'Rozdysponowano w tym miesiącu', rta_available:'Do rozdysponowania',
     rta_income_actual:'rzeczywisty', rta_income_expected:'oczekiwany', rta_income_maxeh:'oczekiwany lub rzeczywisty',
     rta_past_locked:'Miniony miesiąc — przypisywanie zablokowane (tylko podgląd).',
-    rta_explain:'Do rozdysponowania = pozostałość z zeszłego miesiąca + przychód w tym miesiącu − rozdysponowane w tym miesiącu. Pozostałości przechodzą na kolejny miesiąc; przyszłe miesiące używają przychodu oczekiwanego, aby planować z wyprzedzeniem.',
+    rta_explain:'Do rozdysponowania = pozostała gotówka + przychód + dostępny kredyt − rozdysponowane. „Planuj z wyprzedzeniem” pozwala użyć przychodu planowanego; „Uwzględnij dostępne limity” dodaje dostępny kredyt. Nie można rozdysponować ponad tę sumę.',
     add_txn:'Transakcja',
     nav_dashboard:'Pulpit', nav_budget:'Budżet', nav_transactions:'Transakcje', nav_accounts:'Konta', nav_reports:'Raporty', nav_more:'Więcej',
     on_budget:'Budżetowe', tracking:'Śledzone', add_account:'+ Dodaj konto', net_worth:'Wartość netto',
     export:'Eksport', import:'Import', logout:'Wyloguj', language:'Język',
+    set_plan_ahead:'Planuj z wyprzedzeniem', set_use_limits:'Uwzględnij dostępne limity',
     auth_intro:'Zaloguj się e-mailem, aby zsynchronizować budżet na wszystkich urządzeniach.', auth_email_ph:'twój@email.pl',
     auth_send:'Wyślij link do logowania', auth_enter_email:'Podaj adres e-mail.', auth_sending:'Wysyłam link…',
     auth_sent:e=>`✓ Sprawdź skrzynkę — link do logowania wysłany na ${e}.`, auth_error:m=>`Błąd: ${m}`,
@@ -1000,6 +1005,9 @@ function normalize(s){
   }
   if(!Array.isArray(s.incomeGroups)) s.incomeGroups=[];
   if(!Array.isArray(s.tags)) s.tags=[];
+  if(!s.settings||typeof s.settings!=='object') s.settings={};
+  if(s.settings.planAhead==null) s.settings.planAhead=false;   // Plan ahead: allow assigning against planned income
+  if(s.settings.useLimits==null) s.settings.useLimits=false;   // Use available limits: allow assigning against credit
   if(!s.incomePlan||typeof s.incomePlan!=='object') s.incomePlan={};
   if(!s.incomeOverride||typeof s.incomeOverride!=='object') s.incomeOverride={};
   if(!s.spendPlan||typeof s.spendPlan!=='object') s.spendPlan={};
@@ -1311,46 +1319,46 @@ function earliestBudgetMonth(){
   for(const arr of Object.values(state.spendPlan||{})) (arr||[]).forEach(r=>upd(r.from));
   return min || currentMonthKey();
 }
-// "Available to assign" at the end of month m = leftover carried in + income(m) − assigned(m); leftovers roll forward
-function readyToAssignMonth(m){
-  let cur=earliestBudgetMonth(); if(m<cur) cur=m;
-  let carry=0;
-  for(let guard=0; guard<600; guard++){
-    const end = carry + incomeBasis(cur) - assignedTotalMonth(cur);
-    if(cur===m) return end;
-    carry=end; cur=nextMonthKey(cur);
-    if(cur>m) return carry;
-  }
-  return carry;
+// Assignable ceiling for month m = income + real leftover cash + available credit, each term gated by a settings switch:
+//  • income  — "Plan ahead" ON: max(real, planned) (real always wins when bigger) · OFF: real inflow only
+//  • leftover — real cash carried in from last month (always)
+//  • credit   — "Use available limits" ON: available credit headroom · OFF: 0
+// You can never assign past this ceiling (the assign editor clamps to it).
+function assignableCeiling(m){
+  const st=state.settings||{};
+  const real=monthStats(m).income;                                       // this month's real inflow (excl. opening balances)
+  const inc = st.planAhead ? Math.max(real, incomeExpectedTotal(m)) : real;
+  const leftover = cashAsOf(prevMonthKey(m));                            // real cash carried in from last month (floored ≥0 per account)
+  const credit = st.useLimits ? availableCreditAsOf(m) : 0;
+  return inc + leftover + credit;
 }
+// Ready to Assign = assignable ceiling − what's already assigned this month
+function readyToAssignMonth(m){ return assignableCeiling(m) - assignedTotalMonth(m); }
 // header/pill uses the currently-viewed month
 function readyToAssign(){ return readyToAssignMonth(ui.month); }
 const isPastMonth = m => m < currentMonthKey();
 function netWorth(){ return state.accounts.reduce((s,a)=>s+acctBalance(a.id),0); }
-// Per-month breakdown of "Available to assign": carry-in + income − assigned = available.
+// Breakdown of Ready to Assign for month m: leftover + income (+ credit) − assigned = available.
 function openRtaBreakdown(){
-  const m=ui.month, prev=(function(){ let c=earliestBudgetMonth(); if(m<=c) return null; let p=c; while(nextMonthKey(p)<m) p=nextMonthKey(p); return p; })();
-  const carry = m<=earliestBudgetMonth() ? 0 : readyToAssignMonth(prev);
-  const cur=currentMonthKey();
-  const basis = incomeBasis(m);
-  const basisLabel = m<cur ? T('rta_income_actual') : m>cur ? T('rta_income_expected') : T('rta_income_maxeh');
+  const m=ui.month, st=state.settings||{};
+  const real=monthStats(m).income, planned=incomeExpectedTotal(m);
+  const inc = st.planAhead ? Math.max(real, planned) : real;
+  const incLabel = (st.planAhead && planned>real) ? T('rta_income_expected') : T('rta_income_actual');
+  const leftover = cashAsOf(prevMonthKey(m));
+  const credit = st.useLimits ? availableCreditAsOf(m) : 0;
   const assignedM = assignedTotalMonth(m);
   const avail = readyToAssignMonth(m);
-  const orphan = (function(){ let o=0; const obj=state.assignments[m]||{}; for(const[c,v]of Object.entries(obj)) if(!catById(c)) o+=v; return o; })();
   openModal(`<div class="modal"><div class="modal-h"><h3>${T('rta_breakdown_title')} — ${keyToLabel(m)}</h3><button class="x" data-close>×</button></div>
     <div class="modal-b">
-      <div class="rb-row"><span>${T('rta_carry_in')}</span><span class="rb-amt ${carry<0?'neg':''}">${fmt(carry)}</span></div>
-      <div class="rb-row"><span>${T('rta_income')} <span style="color:var(--ink-soft);font-size:.82em">(${basisLabel})</span></span><span class="rb-amt">${fmt(basis)}</span></div>
+      <div class="rb-row"><span>${T('dash_leftover', monShort(prevMonthKey(m)))}</span><span class="rb-amt">${fmt(leftover)}</span></div>
+      <div class="rb-row"><span>${T('rta_income')} <span style="color:var(--ink-soft);font-size:.82em">(${incLabel})</span></span><span class="rb-amt">${fmt(inc)}</span></div>
+      ${st.useLimits?`<div class="rb-row"><span>${T('dash_avail_credit')}</span><span class="rb-amt">${fmt(credit)}</span></div>`:''}
       <div class="rb-row"><span>${T('rta_assigned_month')}</span><span class="rb-amt">−${fmt(assignedM)}</span></div>
       <div class="rb-row total big"><span>${T('rta_available')}</span><span class="rb-amt ${avail<0?'neg':''}">${fmt(avail)}</span></div>
       ${isPastMonth(m)?`<div class="tgt-txt" style="margin-top:10px">${T('rta_past_locked')}</div>`:''}
-      ${orphan?`<div class="rb-sec-h" style="margin-top:16px;color:var(--red)">⚠ ${T('rta_orphan')}</div>
-        <div class="rb-row"><span style="color:var(--ink-soft)">${fmt(orphan)} ${T('this_month')}</span><button class="btn" id="rbPurge" style="padding:4px 10px">${T('rta_purge')}</button></div>`:''}
       <div class="tgt-txt" style="margin-top:12px">${T('rta_explain')}</div>
     </div>
     <div class="modal-f"><button class="btn" data-close>${T('close')}</button></div></div>`);
-  const pg=modalHost.querySelector('#rbPurge');
-  if(pg) pg.onclick=()=>{ const obj=state.assignments[m]||{}; let r=0; for(const c of Object.keys(obj)) if(!catById(c)){ r+=obj[c]; delete obj[c]; } save(); toast(T('rta_purge_done', fmt(r))); closeModal(); render(); };
 }
 
 /* target progress: returns {needed, funded, pct, state:'funded'|'under'|'none'} */
@@ -1628,7 +1636,13 @@ function openPlanTarget(catId, kind){
   };
   $('#itSave').onclick=()=>{
     let v=parseAmt($('#itAmt').value); if(v<childSum) v=childSum;
-    const own=v-childSum;   // free assigning — over-assigning just drives Ready-to-Assign negative (strict mode TBD)
+    let own=v-childSum;
+    // Hard cap: can't assign past the month's ceiling (income + leftover + credit, per the switches).
+    if(!income){
+      const curOwn=spendTarget(catId,m);
+      const maxOwn=curOwn + Math.max(0, readyToAssignMonth(m));   // current share + funds still left to assign
+      if(own>maxOwn){ own=maxOwn; toast(T('assign_capped')); }
+    }
     const dueDay=Math.max(0,Math.min(31, parseInt($('#itDue').value,10)||0))||null;
     const freqV=$('#itFreq').value, everyN=Math.max(2,Math.min(12, parseInt($('#itEvery').value,10)||3));
     write(own, dueDay, freqV, everyN, $('#itFuture').checked);
@@ -1966,7 +1980,7 @@ function dashboardView(){
   const asg       = assignedTotalMonth(m);         // assigned this month
   const cashBalance = leftoverCash + income;       // cash carried in + this month's real inflow
   const availCredit = availableCreditAsOf(m);      // available credit limits (unused headroom) — shown in Bills
-  const asgLeft   = cashBalance - asg;             // >0 still to assign, <0 assigned more than you have
+  const asgLeft   = readyToAssignMonth(m);         // >0 still to assign, <0 assigned more than you have (respects the switches)
   const availFunds  = availableFundsAsOf(m);       // available funds for the viewed month (past = that month's leftover)
 
   // plain informational row (value red when negative)
@@ -1983,18 +1997,18 @@ function dashboardView(){
   // ---- Cost to be me (partial — more later) ----
   const inflowStatus = income>planned ? ['good',T('dash_inc_more')] : income<planned ? ['bad',T('dash_inc_less')] : ['neu',T('dash_inc_as')];
   const asgStatus    = asgLeft>0 ? ['info',T('dash_asg_left')] : asgLeft<0 ? ['bad',T('dash_asg_over')] : ['good',T('dash_asg_all')];
+  const spendVsAsg = spent<asg ? ['good',T('dash_spent_less_asg')] : spent>asg ? ['bad',T('dash_spent_more_asg')] : ['neu',T('dash_spent_as_asg')];
   const cost = `<div class="dash-box"><h3>${T('dash_cost_title')}</h3>
     ${row(T('dash_expected_income'), planned)}
     ${stat(inflowStatus[0], inflowStatus[1], inflowDiff)}
     ${row(T('dash_assigned', monShort(m)), asg)}
-    ${stat(asgStatus[0], asgStatus[1], asgLeft)}</div>`;
+    ${stat(asgStatus[0], asgStatus[1], asgLeft)}
+    ${stat(spendVsAsg[0], spendVsAsg[1], spend)}</div>`;
 
   // ---- Bills ----
-  const spendVsAsg = spent<asg ? ['good',T('dash_spent_less_asg')] : spent>asg ? ['bad',T('dash_spent_more_asg')] : ['neu',T('dash_spent_as_asg')];
   const spendVsInc = spent<income ? ['good',T('dash_spent_less_inc')] : spent>income ? ['bad',T('dash_spent_more_inc')] : ['neu',T('dash_spent_as_inc')];
   const bills = `<div class="dash-box"><h3>${T('dash_bills_title')}</h3>
     ${row(T('dash_activity', monShort(m)), spend)}
-    ${stat(spendVsAsg[0], spendVsAsg[1], spend)}
     ${stat(spendVsInc[0], spendVsInc[1], income+spend)}
     ${row(T('dash_avail_credit'), availCredit)}
     ${row(T('available_funds'), availFunds)}</div>`;
@@ -2911,7 +2925,14 @@ function importJSON(file){
 /* ---- sidebar footer (account + backup) ---- */
 function renderSideFoot(){
   const el=document.getElementById('sideFoot'); if(!el) return;
+  const st=(state&&state.settings)||{};
   el.innerHTML=`
+    <div class="sf-settings">
+      <label class="sf-set-row"><span>${T('set_plan_ahead')}</span>
+        <button class="cm-toggle ${st.planAhead?'on':''}" data-set="planAhead" role="switch" aria-checked="${!!st.planAhead}"><span class="knob"></span></button></label>
+      <label class="sf-set-row"><span>${T('set_use_limits')}</span>
+        <button class="cm-toggle ${st.useLimits?'on':''}" data-set="useLimits" role="switch" aria-checked="${!!st.useLimits}"><span class="knob"></span></button></label>
+    </div>
     <div class="lang-tog">
       <button data-lang="en" class="${LANG==='en'?'on':''}">EN</button>
       <button data-lang="pl" class="${LANG==='pl'?'on':''}">PL</button>
@@ -2923,6 +2944,7 @@ function renderSideFoot(){
       <button id="sfLogout">${T('logout')}</button>
     </div>
     <input type="file" id="sfFile" accept="application/json" style="display:none">`;
+  el.querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{ if(!state.settings)state.settings={}; state.settings[b.dataset.set]=!state.settings[b.dataset.set]; save(); render(); });
   el.querySelectorAll('[data-lang]').forEach(b=>b.onclick=()=>setLang(b.dataset.lang));
   el.querySelector('#sfExport').onclick=exportJSON;
   el.querySelector('#sfImport').onclick=()=>el.querySelector('#sfFile').click();
