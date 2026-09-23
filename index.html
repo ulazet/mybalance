@@ -575,22 +575,33 @@
   .sidebar.collapsed .collapse-btn{position:static;transform:rotate(180deg);}
   .sidebar.collapsed .nav button{justify-content:center;padding:11px 0;}
   .sidebar.collapsed .nav button span{display:none;}
-  .sidebar.collapsed .accts,.sidebar.collapsed .side-foot{display:none;}
-  /* ===== language toggle ===== */
-  .sf-settings{display:flex;flex-direction:column;gap:7px;margin-bottom:12px;}
-  .sf-set-row{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;
-    font-size:.75rem;font-weight:600;color:var(--ink-inv-soft);}
-  .lang-tog{display:flex;gap:4px;margin-bottom:10px;}
-  .lang-tog button{flex:1;padding:6px;border-radius:var(--r-sm);font-size:.72rem;font-weight:700;
-    color:var(--ink-inv-soft);background:rgba(255,255,255,.06);transition:.1s;}
-  .lang-tog button.on{background:var(--brand);color:#fff;}
-  .lang-tog button:not(.on):hover{background:rgba(255,255,255,.14);color:#fff;}
-  /* ===== sidebar footer ===== */
-  .side-foot{padding:12px;border-top:1px solid var(--line-dark);}
-  .side-foot .sf-user{font-size:.74rem;color:var(--ink-inv-soft);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px;}
-  .side-foot .sf-actions{display:flex;gap:6px;}
-  .side-foot .sf-actions button{flex:1;padding:7px 4px;border-radius:var(--r-sm);font-size:.74rem;font-weight:600;color:var(--ink-inv-soft);background:rgba(255,255,255,.06);transition:.1s;}
-  .side-foot .sf-actions button:hover{background:rgba(255,255,255,.14);color:#fff;}
+  .sidebar.collapsed .accts{display:none;}
+  /* ===== sidebar user menu ===== */
+  .side-foot{padding:10px;border-top:1px solid var(--line-dark);}
+  .user-menu-btn{display:flex;align-items:center;gap:10px;width:100%;padding:8px;border-radius:var(--r-md);background:rgba(255,255,255,.04);transition:.12s;text-align:left;}
+  .user-menu-btn:hover{background:rgba(255,255,255,.12);}
+  .um-avatar{flex:0 0 auto;width:30px;height:30px;border-radius:50%;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.85rem;}
+  .um-info{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25;}
+  .um-name{font-size:.78rem;font-weight:600;color:var(--ink-inv);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .um-sub{font-size:.68rem;color:var(--ink-inv-soft);}
+  .um-gear{flex:0 0 auto;color:var(--ink-inv-soft);}
+  .sidebar.collapsed .um-info,.sidebar.collapsed .um-gear{display:none;}
+  .sidebar.collapsed .user-menu-btn{justify-content:center;padding:8px 0;}
+  .sidebar.collapsed .um-avatar{width:34px;height:34px;}
+  /* ===== settings modal ===== */
+  .set-acct{display:flex;align-items:center;gap:12px;margin-bottom:4px;}
+  .um-avatar.big{width:44px;height:44px;font-size:1.15rem;}
+  .set-email{font-weight:700;font-size:.95rem;color:var(--ink);word-break:break-all;}
+  .set-sec{margin-top:18px;}
+  .set-sec-h{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);font-weight:700;margin-bottom:8px;}
+  .set-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:8px 0;cursor:pointer;}
+  .set-row .set-lbl{font-size:.9rem;font-weight:600;color:var(--ink);}
+  .set-row .set-desc{font-size:.76rem;color:var(--ink-soft);margin-top:2px;max-width:340px;}
+  .set-actions{display:flex;gap:8px;}
+  .set-langtog{display:flex;gap:6px;}
+  .set-langtog button{padding:7px 18px;border-radius:var(--r-sm);font-size:.78rem;font-weight:700;color:var(--ink-soft);background:var(--grey-bg);transition:.1s;}
+  .set-langtog button.on{background:var(--brand);color:#fff;}
+  .btn.danger{background:var(--red-bg);color:var(--red);}
 </style>
 </head>
 <body>
@@ -684,7 +695,10 @@ const I18N = {
     nav_dashboard:'Dashboard', nav_budget:'Budget', nav_transactions:'Transactions', nav_accounts:'Accounts', nav_reports:'Reports', nav_more:'More',
     on_budget:'On-budget', tracking:'Tracking', add_account:'+ Add account', net_worth:'Net worth',
     export:'Export', import:'Import', logout:'Log out', language:'Language',
+    settings:'Settings', set_budgeting:'Budgeting', set_data:'Data & backup',
     set_plan_ahead:'Plan ahead', set_use_limits:'Use available limits',
+    set_plan_ahead_desc:'Let Ready to Assign include planned income, not just money already received.',
+    set_use_limits_desc:'Add available credit limits (cards & overdraft) to what you can assign.',
     auth_intro:'Sign in with your email to sync your budget across all your devices.', auth_email_ph:'you@email.com',
     auth_send:'Send login link', auth_enter_email:'Enter your email.', auth_sending:'Sending link…',
     auth_sent:e=>`✓ Check your inbox — a login link was sent to ${e}.`, auth_error:m=>`Error: ${m}`,
@@ -778,7 +792,10 @@ const I18N = {
     nav_dashboard:'Pulpit', nav_budget:'Budżet', nav_transactions:'Transakcje', nav_accounts:'Konta', nav_reports:'Raporty', nav_more:'Więcej',
     on_budget:'Budżetowe', tracking:'Śledzone', add_account:'+ Dodaj konto', net_worth:'Wartość netto',
     export:'Eksport', import:'Import', logout:'Wyloguj', language:'Język',
+    settings:'Ustawienia', set_budgeting:'Budżetowanie', set_data:'Dane i kopia',
     set_plan_ahead:'Planuj z wyprzedzeniem', set_use_limits:'Uwzględnij dostępne limity',
+    set_plan_ahead_desc:'Pozwól, aby „Do rozdysponowania” uwzględniało planowany przychód, nie tylko już otrzymany.',
+    set_use_limits_desc:'Dodaj dostępne limity kredytowe (karty i debet) do kwoty możliwej do rozdysponowania.',
     auth_intro:'Zaloguj się e-mailem, aby zsynchronizować budżet na wszystkich urządzeniach.', auth_email_ph:'twój@email.pl',
     auth_send:'Wyślij link do logowania', auth_enter_email:'Podaj adres e-mail.', auth_sending:'Wysyłam link…',
     auth_sent:e=>`✓ Sprawdź skrzynkę — link do logowania wysłany na ${e}.`, auth_error:m=>`Błąd: ${m}`,
@@ -2922,34 +2939,63 @@ function importJSON(file){
   r.readAsText(file);
 }
 
-/* ---- sidebar footer (account + backup) ---- */
+/* ---- sidebar user-menu button → opens Settings modal ---- */
+const GEAR_SVG=`<svg class="um-gear" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>`;
+function userInitial(){ const e=currentUser?currentUser.email:''; return ((e||'?').trim().charAt(0)||'U').toUpperCase(); }
 function renderSideFoot(){
   const el=document.getElementById('sideFoot'); if(!el) return;
-  const st=(state&&state.settings)||{};
+  const email=currentUser?currentUser.email:'';
   el.innerHTML=`
-    <div class="sf-settings">
-      <label class="sf-set-row"><span>${T('set_plan_ahead')}</span>
-        <button class="cm-toggle ${st.planAhead?'on':''}" data-set="planAhead" role="switch" aria-checked="${!!st.planAhead}"><span class="knob"></span></button></label>
-      <label class="sf-set-row"><span>${T('set_use_limits')}</span>
-        <button class="cm-toggle ${st.useLimits?'on':''}" data-set="useLimits" role="switch" aria-checked="${!!st.useLimits}"><span class="knob"></span></button></label>
+    <button class="user-menu-btn" id="userMenuBtn" title="${T('settings')}">
+      <span class="um-avatar">${escapeHtml(userInitial())}</span>
+      <span class="um-info"><span class="um-name">${escapeHtml(email||T('settings'))}</span><span class="um-sub">${T('settings')}</span></span>
+      ${GEAR_SVG}
+    </button>`;
+  el.querySelector('#userMenuBtn').onclick=openSettings;
+}
+function openSettings(){
+  const st=(state&&state.settings)||{};
+  const email=currentUser?currentUser.email:'';
+  const toggle=(key,lbl,desc)=>`<label class="set-row"><div><div class="set-lbl">${lbl}</div><div class="set-desc">${desc}</div></div>
+    <button class="cm-toggle ${st[key]?'on':''}" data-set="${key}" role="switch" aria-checked="${!!st[key]}"><span class="knob"></span></button></label>`;
+  openModal(`<div class="modal"><div class="modal-h"><h3>${T('settings')}</h3><button class="x" data-close>×</button></div>
+    <div class="modal-b">
+      <div class="set-acct"><span class="um-avatar big">${escapeHtml(userInitial())}</span><div class="set-email">${escapeHtml(email||'—')}</div></div>
+
+      <div class="set-sec"><div class="set-sec-h">${T('language')}</div>
+        <div class="set-langtog">
+          <button data-lang="en" class="${LANG==='en'?'on':''}">EN</button>
+          <button data-lang="pl" class="${LANG==='pl'?'on':''}">PL</button>
+        </div></div>
+
+      <div class="set-sec"><div class="set-sec-h">${T('set_budgeting')}</div>
+        ${toggle('planAhead', T('set_plan_ahead'), T('set_plan_ahead_desc'))}
+        ${toggle('useLimits', T('set_use_limits'), T('set_use_limits_desc'))}
+      </div>
+
+      <div class="set-sec"><div class="set-sec-h">${T('set_data')}</div>
+        <div class="set-actions">
+          <button class="btn ghost" id="setExport">${T('export')}</button>
+          <button class="btn ghost" id="setImport">${T('import')}</button>
+        </div></div>
+      <input type="file" id="setFile" accept="application/json" style="display:none">
     </div>
-    <div class="lang-tog">
-      <button data-lang="en" class="${LANG==='en'?'on':''}">EN</button>
-      <button data-lang="pl" class="${LANG==='pl'?'on':''}">PL</button>
-    </div>
-    <div class="sf-user">${currentUser?currentUser.email:''}</div>
-    <div class="sf-actions">
-      <button id="sfExport">${T('export')}</button>
-      <button id="sfImport">${T('import')}</button>
-      <button id="sfLogout">${T('logout')}</button>
-    </div>
-    <input type="file" id="sfFile" accept="application/json" style="display:none">`;
-  el.querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{ if(!state.settings)state.settings={}; state.settings[b.dataset.set]=!state.settings[b.dataset.set]; save(); render(); });
-  el.querySelectorAll('[data-lang]').forEach(b=>b.onclick=()=>setLang(b.dataset.lang));
-  el.querySelector('#sfExport').onclick=exportJSON;
-  el.querySelector('#sfImport').onclick=()=>el.querySelector('#sfFile').click();
-  el.querySelector('#sfFile').onchange=e=>{ if(e.target.files[0]) importJSON(e.target.files[0]); e.target.value=''; };
-  el.querySelector('#sfLogout').onclick=doLogout;
+    <div class="modal-f">
+      <button class="btn danger" id="setLogout" style="margin-right:auto">${T('logout')}</button>
+      <button class="btn" data-close>${T('close')}</button>
+    </div></div>`);
+  const $=s=>modalHost.querySelector(s);
+  modalHost.querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{
+    if(!state.settings) state.settings={};
+    const v=!state.settings[b.dataset.set]; state.settings[b.dataset.set]=v;
+    b.classList.toggle('on', v); b.setAttribute('aria-checked', v);
+    save(); render();                       // update pill/badge behind the modal; modal stays open
+  });
+  modalHost.querySelectorAll('[data-lang]').forEach(b=>b.onclick=()=>{ setLang(b.dataset.lang); closeModal(); openSettings(); });
+  $('#setExport').onclick=exportJSON;
+  $('#setImport').onclick=()=>$('#setFile').click();
+  $('#setFile').onchange=e=>{ if(e.target.files[0]){ closeModal(); importJSON(e.target.files[0]); } e.target.value=''; };
+  $('#setLogout').onclick=()=>{ closeModal(); doLogout(); };
 }
 
 /* ---- session lifecycle ---- */
